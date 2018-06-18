@@ -36,9 +36,9 @@ class TabDataRepository @Inject constructor(private val tabsDao: TabsDao, privat
 
     private val siteData: LinkedHashMap<String, MutableLiveData<Site>> = LinkedHashMap()
 
-    override fun add(url: String?): String {
+    override fun add(url: String?, selectNewTab: Boolean): String {
         val tabId = UUID.randomUUID().toString()
-        add(tabId, buildSiteData(url))
+        add(tabId, buildSiteData(url), selectNewTab)
         return tabId
     }
 
@@ -51,10 +51,17 @@ class TabDataRepository @Inject constructor(private val tabsDao: TabsDao, privat
         return data
     }
 
-    override fun add(tabId: String, data: MutableLiveData<Site>) {
+    override fun add(tabId: String, data: MutableLiveData<Site>, selectNewTab: Boolean) {
         siteData[tabId] = data
+        val tab = TabEntity(tabId, data.value?.url, data.value?.title)
         Schedulers.io().scheduleDirect {
-            tabsDao.addAndSelectTab(TabEntity(tabId, data.value?.url, data.value?.title))
+
+            if (selectNewTab) {
+                tabsDao.addAndSelectTab(tab)
+            } else {
+                tabsDao.addTab(tab)
+            }
+
         }
     }
 

@@ -52,7 +52,7 @@ class TabSwitcherViewModelTest {
     @Before
     fun before() {
         MockitoAnnotations.initMocks(this)
-        whenever(mockTabRepository.add()).thenReturn("TAB_ID")
+        whenever(mockTabRepository.add(any(), any())).thenReturn("TAB_ID")
         testee = TabSwitcherViewModel(mockTabRepository)
         testee.command.observeForever(mockCommandObserver)
     }
@@ -60,7 +60,7 @@ class TabSwitcherViewModelTest {
     @Test
     fun whenNewTabRequestedThenRepositoryNotifiedAndSwitcherClosed() {
         testee.onNewTabRequested()
-        verify(mockTabRepository).add()
+        verify(mockTabRepository).add(anyOrNull(), any())
         verify(mockCommandObserver).onChanged(commandCaptor.capture())
         assertEquals(Command.Close, commandCaptor.lastValue)
     }

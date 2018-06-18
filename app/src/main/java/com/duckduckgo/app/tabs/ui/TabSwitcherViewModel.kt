@@ -21,8 +21,8 @@ import android.arch.lifecycle.ViewModel
 import android.support.annotation.StringRes
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.SingleLiveEvent
-import com.duckduckgo.app.tabs.model.TabRepository
 import com.duckduckgo.app.tabs.model.TabEntity
+import com.duckduckgo.app.tabs.model.TabRepository
 
 class TabSwitcherViewModel(private val tabRepository: TabRepository) : ViewModel() {
 
@@ -35,7 +35,7 @@ class TabSwitcherViewModel(private val tabRepository: TabRepository) : ViewModel
     }
 
     fun onNewTabRequested() {
-        tabRepository.add()
+        tabRepository.add(selectNewTab = true)
         command.value = Command.Close
     }
 

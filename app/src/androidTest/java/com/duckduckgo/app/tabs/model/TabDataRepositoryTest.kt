@@ -62,7 +62,7 @@ class TabDataRepositoryTest {
 
     @Test
     fun whenAddCalledThenTabAddedAndSelectedAndBlankSiteDataCreated() {
-        val createdId = testee.add()
+        val createdId = testee.add(selectNewTab = true)
         verify(mockDao).addAndSelectTab(any())
         assertNotNull(testee.retrieveSiteData(createdId))
     }
@@ -70,7 +70,7 @@ class TabDataRepositoryTest {
     @Test
     fun whenAddCalledWithUrlThenTabAddedAndSelectedAndUrlSiteDataCreated() {
         val url = "http://example.com"
-        val createdId = testee.add(url)
+        val createdId = testee.add(url, selectNewTab = true)
         verify(mockDao).addAndSelectTab(any())
         assertNotNull(testee.retrieveSiteData(createdId))
         assertEquals(url, testee.retrieveSiteData(createdId).value!!.url)
@@ -79,7 +79,7 @@ class TabDataRepositoryTest {
     @Test
     fun whenAddRecordCalledThenTabAddedAndSiteDataAdded() {
         val record = MutableLiveData<Site>()
-        testee.add(TAB_ID, record)
+        testee.add(TAB_ID, record, true)
         verify(mockDao).addAndSelectTab(any())
         assertSame(record, testee.retrieveSiteData(TAB_ID))
     }
@@ -87,7 +87,7 @@ class TabDataRepositoryTest {
     @Test
     fun whenDataExistsForTabThenRetrieveReturnsIt() {
         val record = MutableLiveData<Site>()
-        testee.add(TAB_ID, record)
+        testee.add(TAB_ID, record, true)
         assertSame(record, testee.retrieveSiteData(TAB_ID))
     }
 
@@ -99,7 +99,7 @@ class TabDataRepositoryTest {
     @Test
     fun whenTabDeletedThenTabAndDataCleared() {
         val siteData = MutableLiveData<Site>()
-        testee.add(TAB_ID, siteData)
+        testee.add(TAB_ID, siteData, true)
 
         testee.delete(TabEntity(TAB_ID))
         verify(mockDao).deleteTabAndUpdateSelection(any())
@@ -109,7 +109,7 @@ class TabDataRepositoryTest {
     @Test
     fun whenAllDeletedThenTabAndDataCleared() {
         val siteData = MutableLiveData<Site>()
-        testee.add(TAB_ID, siteData)
+        testee.add(TAB_ID, siteData, true)
         testee.deleteAll()
         verify(mockDao).deleteAllTabs()
         assertNotSame(siteData, testee.retrieveSiteData(TAB_ID))

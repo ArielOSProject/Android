@@ -48,16 +48,16 @@ class BrowserViewModel(
     val command: SingleLiveEvent<Command> = SingleLiveEvent()
 
     fun onNewTabRequested() {
-        tabRepository.add()
+        tabRepository.add(selectNewTab = true)
     }
 
     fun onOpenInNewTabRequested(query: String) {
-        tabRepository.add(queryUrlConverter.convertQueryToUrl(query))
+        tabRepository.add(queryUrlConverter.convertQueryToUrl(query), selectNewTab = false)
     }
 
     fun onTabsUpdated(tabs: List<TabEntity>?) {
         if (tabs == null || tabs.isEmpty()) {
-            tabRepository.add()
+            tabRepository.add(selectNewTab = true)
             return
         }
     }

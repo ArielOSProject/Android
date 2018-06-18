@@ -61,7 +61,7 @@ class BrowserViewModelTest {
         MockitoAnnotations.initMocks(this)
         testee = BrowserViewModel(mockTabRepository, mockOmnibarEntryConverter)
         testee.command.observeForever(mockCommandObserver)
-        whenever(mockTabRepository.add()).thenReturn(TAB_ID)
+        whenever(mockTabRepository.add(selectNewTab = false)).thenReturn(TAB_ID)
         whenever(mockOmnibarEntryConverter.convertQueryToUrl(any())).then { it.arguments.first() }
     }
 
@@ -73,20 +73,20 @@ class BrowserViewModelTest {
     @Test
     fun whenNewTabRequestedThenTabAddedToRepository() {
         testee.onNewTabRequested()
-        verify(mockTabRepository).add()
+        verify(mockTabRepository).add(anyOrNull(), any())
     }
 
     @Test
     fun whenOpenInNewTabRequestedThenTabAddedToRepository() {
         val url = "http://example.com"
         testee.onOpenInNewTabRequested(url)
-        verify(mockTabRepository).add(url)
+        verify(mockTabRepository).add(eq(url), any())
     }
 
     @Test
     fun whenTabsUpdatedAndNoTabsThenNewTabAddedToRepository() {
         testee.onTabsUpdated(ArrayList())
-        verify(mockTabRepository).add()
+        verify(mockTabRepository).add(anyOrNull(), any())
     }
 
     @Test
