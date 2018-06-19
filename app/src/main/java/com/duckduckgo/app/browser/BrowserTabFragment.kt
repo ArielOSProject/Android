@@ -40,6 +40,11 @@ import android.support.v7.widget.LinearLayoutManager
 import android.text.Editable
 import android.view.*
 import android.view.View.VISIBLE
+import android.view.View.inflate
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
+import android.view.animation.AnimationSet
+import android.view.animation.ScaleAnimation
 import android.view.inputmethod.EditorInfo
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -242,7 +247,7 @@ class BrowserTabFragment : Fragment(), FindListener {
         when (it) {
             Command.Refresh -> refresh()
             is Command.OpenInNewTab -> {
-                browserActivity?.openInNewTab(it.query)
+                animateNewTab(it.query)
             }
             is Command.Navigate -> {
                 navigate(it.url)
@@ -286,6 +291,35 @@ class BrowserTabFragment : Fragment(), FindListener {
             }
             is Command.LaunchDefaultAppSystemSettings -> { launchDefaultAppSystemSettings() }
         }
+    }
+
+    private fun animateNewTab(query: String) {
+        val activity = activity ?: return
+        val tabMenuItem: View = activity.findViewById(R.id.tabs) ?: return
+        val view: View = inflate(activity, R.layout.new_tab_animation_view, rootView).findViewById(R.id.newTabAnimation)
+
+        val arWindow = IntArray(2)
+        tabMenuItem.getLocationInWindow(arWindow)
+
+        val scaleAnimation = ScaleAnimation(1f, 0.25f, 1f, 0.25f, Animation.ABSOLUTE, (arWindow[0] + tabMenuItem.measuredWidth).toFloat(), Animation.RELATIVE_TO_SELF, 0f)
+        val alphaAnimation = AlphaAnimation(1f, 0.75f)
+
+        val anims = AnimationSet(true)
+        anims.addAnimation(scaleAnimation)
+        anims.addAnimation(alphaAnimation)
+        anims.duration = 300
+        view.startAnimation(anims)
+
+
+        anims.setAnimationListener(object : Animation.AnimationListener{
+            override fun onAnimationEnd(animation: Animation?) {
+                rootView.removeView(view)
+                browserActivity?.openInNewTab(query)
+            }
+            override fun onAnimationRepeat(animation: Animation?) {}
+            override fun onAnimationStart(animation: Animation?) {}
+        })
+
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
