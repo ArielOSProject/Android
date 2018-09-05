@@ -20,7 +20,7 @@ package com.duckduckgo.app.global
 class AppUrl {
 
     object Url {
-        const val HOST = "duckduckgo.com"
+        const val HOST = "safe.duckduckgo.com"
         const val API = "https://$HOST"
         const val HOME =  "https://$HOST"
         const val ABOUT = "https://$HOST/about"
