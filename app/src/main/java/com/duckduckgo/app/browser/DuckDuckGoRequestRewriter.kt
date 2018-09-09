@@ -68,5 +68,6 @@ class DuckDuckGoRequestRewriter(
             builder.appendQueryParameter(ParamKey.ATB, atb.formatWithVariant(variantManager.getVariant()))
         }
         builder.appendQueryParameter(ParamKey.SOURCE, ParamValue.SOURCE)
+        builder.appendQueryParameter(ParamKey.SAFE_SEARCH, ParamValue.SAFE_SEARCH_ON)
     }
 }

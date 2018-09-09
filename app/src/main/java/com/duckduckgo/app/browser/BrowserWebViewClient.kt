@@ -23,6 +23,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.net.toUri
+import com.duckduckgo.app.global.AppUrl
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -78,9 +80,13 @@ class BrowserWebViewClient @Inject constructor(
                 if (requestRewriter.shouldRewriteRequest(url)) {
                     val newUri = requestRewriter.rewriteRequestWithCustomQueryParams(url)
                     webView.loadUrl(newUri.toString())
-                    return true
                 }
-                return false
+                else{
+                    val tmpUri = replaceUriParameter(url, AppUrl.ParamKey.SAFE_SEARCH,
+                            AppUrl.ParamValue.SAFE_SEARCH_ON)
+                    webView.loadUrl(tmpUri.toString())
+                }
+                return true
             }
         }
     }
@@ -93,6 +99,27 @@ class BrowserWebViewClient @Inject constructor(
         currentUrl = url
         webViewClientListener?.loadingStarted()
         webViewClientListener?.urlChanged(url)
+    }
+
+    private fun replaceUriParameter(uri: Uri, key: String, newValue: String): Uri {
+        val params = uri.queryParameterNames
+        val newUri = uri.buildUpon().clearQuery()
+        var paramFound = false
+        for (param in params) {
+            newUri.appendQueryParameter(param,
+                    if (param == key) {
+                        paramFound = true
+                        newValue
+                    } else {
+                        uri.getQueryParameter(param)
+                    })
+        }
+
+        if(!paramFound){
+            newUri.appendQueryParameter(key, newValue)
+        }
+
+        return newUri.build()
     }
 
     override fun onPageFinished(webView: WebView, url: String?) {

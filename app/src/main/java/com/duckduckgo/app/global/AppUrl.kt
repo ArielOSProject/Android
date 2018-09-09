@@ -34,9 +34,11 @@ class AppUrl {
         const val ATB = "atb"
         const val RETENTION_ATB = "set_atb"
         const val FORM_FACTOR = "f"
+        const val SAFE_SEARCH = "kp"
     }
 
     object ParamValue {
         const val SOURCE = "ddg_android"
+        const val SAFE_SEARCH_ON = "1"
     }
 }
