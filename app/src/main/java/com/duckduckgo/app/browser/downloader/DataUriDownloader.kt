@@ -16,7 +16,7 @@
 
 package com.duckduckgo.app.browser.downloader
 
-import android.support.annotation.WorkerThread
+import androidx.annotation.WorkerThread
 import android.util.Base64
 import com.duckduckgo.app.browser.downloader.DataUriParser.GeneratedFilename
 import com.duckduckgo.app.browser.downloader.DataUriParser.ParseResult
@@ -26,7 +26,8 @@ import java.io.IOException
 import javax.inject.Inject
 
 class DataUriDownloader @Inject constructor(
-        private val dataUriParser: DataUriParser) {
+    private val dataUriParser: DataUriParser
+) {
 
     @WorkerThread
     fun download(pending: FileDownloader.PendingFileDownload, callback: FileDownloader.FileDownloadListener?) {

@@ -19,8 +19,12 @@ package com.duckduckgo.app.browser
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.webkit.WebView.HitTestResult
+import androidx.test.platform.app.InstrumentationRegistry
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.nhaarman.mockito_kotlin.*
+import com.nhaarman.mockitokotlin2.eq
+import com.nhaarman.mockitokotlin2.never
+import com.nhaarman.mockitokotlin2.verify
+import com.nhaarman.mockitokotlin2.whenever
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,10 +50,12 @@ class WebViewLongPressHandlerTest {
     @Mock
     private lateinit var mockPixel: Pixel
 
+    private var context = InstrumentationRegistry.getInstrumentation().targetContext
+
     @Before
     fun setup() {
         MockitoAnnotations.initMocks(this)
-        testee = WebViewLongPressHandler(mockPixel)
+        testee = WebViewLongPressHandler(context, mockPixel)
     }
 
     @Test
@@ -67,31 +73,43 @@ class WebViewLongPressHandlerTest {
     @Test
     fun whenLongPressedWithUnknownTypeThenPixelNotFired() {
         testee.handleLongPress(HitTestResult.UNKNOWN_TYPE, HTTPS_IMAGE_URL, mockMenu)
-        verify(mockPixel, never()).fire(any())
+        verify(mockPixel, never()).fire(Pixel.PixelName.LONG_PRESS)
     }
 
     @Test
-    fun whenLongPressedWithImageTypeThenImageOptionsHeaderAddedToMenu() {
+    fun whenLongPressedWithImageTypeThenUrlHeaderAddedToMenu() {
         testee.handleLongPress(HitTestResult.IMAGE_TYPE, HTTPS_IMAGE_URL, mockMenu)
-        verify(mockMenu).setHeaderTitle(R.string.imageOptions)
+        verify(mockMenu).setHeaderTitle(HTTPS_IMAGE_URL)
     }
 
     @Test
-    fun whenLongPressedWithAnchorImageTypeThenImageOptionsHeaderAddedToMenu() {
+    fun whenLongPressedWithAnchorImageTypeThenUrlHeaderAddedToMenu() {
         testee.handleLongPress(HitTestResult.SRC_IMAGE_ANCHOR_TYPE, HTTPS_IMAGE_URL, mockMenu)
-        verify(mockMenu).setHeaderTitle(R.string.imageOptions)
+        verify(mockMenu).setHeaderTitle(HTTPS_IMAGE_URL)
+    }
+
+    @Test
+    fun whenLongPressedWithAnchorImageTypeThenTabOptionsHeaderAddedToMenu() {
+        testee.handleLongPress(HitTestResult.SRC_IMAGE_ANCHOR_TYPE, HTTPS_IMAGE_URL, mockMenu)
+        verifyNewForegroundTabItemAdded()
+    }
+
+    @Test
+    fun whenLongPressedWithAnchorImageTypeThenBgTabOptionsHeaderAddedToMenu() {
+        testee.handleLongPress(HitTestResult.SRC_IMAGE_ANCHOR_TYPE, HTTPS_IMAGE_URL, mockMenu)
+        verifyNewBackgroundTabItemAdded()
     }
 
     @Test
     fun whenLongPressedWithImageTypeThenDownloadImageMenuAdded() {
         testee.handleLongPress(HitTestResult.IMAGE_TYPE, HTTPS_IMAGE_URL, mockMenu)
-        verify(mockMenu).add(anyInt(), eq(WebViewLongPressHandler.CONTEXT_MENU_ID_DOWNLOAD_IMAGE), anyInt(), eq(R.string.downloadImage))
+        verifyDownloadImageItemAdded()
     }
 
     @Test
     fun whenLongPressedWithAnchorImageTypeThenDownloadImageMenuAdded() {
         testee.handleLongPress(HitTestResult.SRC_IMAGE_ANCHOR_TYPE, HTTPS_IMAGE_URL, mockMenu)
-        verify(mockMenu).add(anyInt(), eq(WebViewLongPressHandler.CONTEXT_MENU_ID_DOWNLOAD_IMAGE), anyInt(), eq(R.string.downloadImage))
+        verifyDownloadImageItemAdded()
     }
 
     @Test
@@ -103,7 +121,7 @@ class WebViewLongPressHandlerTest {
     @Test
     fun whenLongPressedWithImageTypeWhichIsADataUriThenDownloadImageMenuAdded() {
         testee.handleLongPress(HitTestResult.IMAGE_TYPE, DATA_URI_IMAGE_URL, mockMenu)
-        verify(mockMenu).add(anyInt(), eq(WebViewLongPressHandler.CONTEXT_MENU_ID_DOWNLOAD_IMAGE), anyInt(), eq(R.string.downloadImage))
+        verifyDownloadImageItemAdded()
     }
 
     @Test
@@ -128,9 +146,24 @@ class WebViewLongPressHandlerTest {
         assertTrue(action == LongPressHandler.RequiredAction.None)
     }
 
+    private fun verifyDownloadImageItemAdded() {
+        verify(mockMenu).add(anyInt(), eq(WebViewLongPressHandler.CONTEXT_MENU_ID_DOWNLOAD_IMAGE), anyInt(), eq(R.string.downloadImage))
+    }
+
+    private fun verifyNewForegroundTabItemAdded() {
+        verify(mockMenu).add(anyInt(), eq(WebViewLongPressHandler.CONTEXT_MENU_ID_OPEN_IN_NEW_TAB), anyInt(), eq(R.string.openInNewTab))
+    }
+
+    private fun verifyNewBackgroundTabItemAdded() {
+        verify(mockMenu).add(
+            anyInt(),
+            eq(WebViewLongPressHandler.CONTEXT_MENU_ID_OPEN_IN_NEW_BACKGROUND_TAB),
+            anyInt(),
+            eq(R.string.openInNewBackgroundTab)
+        )
+    }
+
     private fun verifyMenuNotAltered() {
-        verify(mockMenu, never()).setHeaderTitle(anyString())
-        verify(mockMenu, never()).setHeaderTitle(anyInt())
         verify(mockMenu, never()).add(anyInt())
         verify(mockMenu, never()).add(anyString())
         verify(mockMenu, never()).add(anyInt(), anyInt(), anyInt(), anyInt())

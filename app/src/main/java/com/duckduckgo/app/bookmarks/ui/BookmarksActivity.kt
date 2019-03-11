@@ -17,25 +17,23 @@
 package com.duckduckgo.app.bookmarks.ui
 
 import android.app.AlertDialog
-import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.support.v7.widget.DividerItemDecoration
-import android.support.v7.widget.RecyclerView.*
 import android.text.Html
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupMenu
+import androidx.lifecycle.Observer
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.RecyclerView.*
 import com.duckduckgo.app.bookmarks.db.BookmarkEntity
 import com.duckduckgo.app.browser.BrowserActivity
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.DuckDuckGoActivity
-import com.duckduckgo.app.global.ViewModelFactory
 import com.duckduckgo.app.global.baseHost
 import com.duckduckgo.app.global.faviconLocation
 import com.duckduckgo.app.global.image.GlideApp
@@ -46,18 +44,13 @@ import kotlinx.android.synthetic.main.include_toolbar.*
 import kotlinx.android.synthetic.main.view_bookmark_entry.view.*
 import org.jetbrains.anko.alert
 import timber.log.Timber
-import javax.inject.Inject
 
 class BookmarksActivity : DuckDuckGoActivity() {
 
-    @Inject
-    lateinit var viewModelFactory: ViewModelFactory
     lateinit var adapter: BookmarksAdapter
     private var deleteDialog: AlertDialog? = null
 
-    private val viewModel: BookmarksViewModel by lazy {
-        ViewModelProviders.of(this, viewModelFactory).get(BookmarksViewModel::class.java)
-    }
+    private val viewModel: BookmarksViewModel by bindViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -148,8 +141,10 @@ class BookmarksActivity : DuckDuckGoActivity() {
         private const val EDIT_BOOKMARK_FRAGMENT_TAG = "EDIT_BOOKMARK"
     }
 
-    class BookmarksAdapter(private val context: Context,
-                           private val viewModel: BookmarksViewModel) : Adapter<BookmarksViewHolder>() {
+    class BookmarksAdapter(
+        private val context: Context,
+        private val viewModel: BookmarksViewModel
+    ) : Adapter<BookmarksViewHolder>() {
 
         var bookmarks: List<BookmarkEntity> = emptyList()
             set(value) {
@@ -158,7 +153,7 @@ class BookmarksActivity : DuckDuckGoActivity() {
             }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BookmarksViewHolder {
-            val inflater = LayoutInflater.from(context)
+            val inflater = LayoutInflater.from(parent.context)
             val view = inflater.inflate(R.layout.view_bookmark_entry, parent, false)
             return BookmarksViewHolder(view, viewModel)
         }
@@ -172,7 +167,7 @@ class BookmarksActivity : DuckDuckGoActivity() {
         }
     }
 
-    class BookmarksViewHolder(itemView: View?, private val viewModel: BookmarksViewModel) :
+    class BookmarksViewHolder(itemView: View, private val viewModel: BookmarksViewModel) :
         ViewHolder(itemView) {
 
         lateinit var bookmark: BookmarkEntity
@@ -202,10 +197,10 @@ class BookmarksActivity : DuckDuckGoActivity() {
             val faviconUrl = Uri.parse(url).faviconLocation()
 
             GlideApp.with(itemView)
-                    .load(faviconUrl)
-                    .placeholder(R.drawable.ic_globe_white_16dp)
-                    .error(R.drawable.ic_globe_white_16dp)
-                    .into(itemView.favicon)
+                .load(faviconUrl)
+                .placeholder(R.drawable.ic_globe_gray_16dp)
+                .error(R.drawable.ic_globe_gray_16dp)
+                .into(itemView.favicon)
         }
 
         private fun parseDisplayUrl(urlString: String): String {

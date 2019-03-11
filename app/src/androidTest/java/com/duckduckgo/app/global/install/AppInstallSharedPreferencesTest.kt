@@ -17,8 +17,8 @@
 package com.duckduckgo.app.global.install
 
 import android.content.Context
-import android.support.test.InstrumentationRegistry
 import androidx.core.content.edit
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -27,22 +27,12 @@ class AppInstallSharedPreferencesTest {
 
     private lateinit var testee: AppInstallSharedPreferences
 
-    private val context = InstrumentationRegistry.getContext()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Before
     fun setup() {
         context.getSharedPreferences(AppInstallSharedPreferences.FILENAME, Context.MODE_PRIVATE).edit { clear() }
         testee = AppInstallSharedPreferences(context)
-    }
-
-    @Test
-    fun whenInitializedThenUserHasNotBeenMarkedAsHavingPreviouslyDeclinedBanner() {
-        assertFalse(testee.hasUserDeclinedDefaultBrowserBannerPreviously())
-    }
-
-    @Test
-    fun whenInitializedThenUserHasNotBeenMarkedAsHavingPreviouslyDeclinedHomeScreenCallToAction() {
-        assertFalse(testee.hasUserDeclinedDefaultBrowserHomeScreenCallToActionPreviously())
     }
 
     @Test
@@ -63,19 +53,4 @@ class AppInstallSharedPreferencesTest {
         testee.installTimestamp = timestamp
         assertEquals(timestamp, testee.installTimestamp)
     }
-
-    @Test
-    fun whenUserPreviouslyDeclinedBannerThenThatIsReturnedWhenQueried() {
-        val timestamp = 1L
-        testee.recordUserDeclinedBannerToSetDefaultBrowser(timestamp)
-        assertTrue(testee.hasUserDeclinedDefaultBrowserBannerPreviously())
-    }
-
-    @Test
-    fun whenUserPreviouslyDeclinedHomeScreenCallToActionThenThatIsReturnedWhenQueried() {
-        val timestamp = 1L
-        testee.recordUserDeclinedHomeScreenCallToActionToSetDefaultBrowser(timestamp)
-        assertTrue(testee.hasUserDeclinedDefaultBrowserHomeScreenCallToActionPreviously())
-    }
-
 }

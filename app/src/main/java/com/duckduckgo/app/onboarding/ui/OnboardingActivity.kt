@@ -16,20 +16,15 @@
 
 package com.duckduckgo.app.onboarding.ui
 
-import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
-import android.support.annotation.ColorInt
-import android.support.annotation.RequiresApi
-import android.support.v4.content.ContextCompat
+import androidx.annotation.ColorInt
+import androidx.core.content.ContextCompat
 import android.view.View
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.DuckDuckGoActivity
-import com.duckduckgo.app.global.ViewModelFactory
 import com.duckduckgo.app.global.view.ColorCombiner
-import com.duckduckgo.app.global.view.launchDefaultAppActivity
 import com.duckduckgo.app.onboarding.ui.ColorChangingPageListener.NewColorListener
 import kotlinx.android.synthetic.main.activity_onboarding.*
 import javax.inject.Inject
@@ -38,16 +33,11 @@ import javax.inject.Inject
 class OnboardingActivity : DuckDuckGoActivity() {
 
     @Inject
-    lateinit var viewModelFactory: ViewModelFactory
-
-    @Inject
     lateinit var colorCombiner: ColorCombiner
 
     private lateinit var viewPageAdapter: PagerAdapter
 
-    private val viewModel: OnboardingViewModel by lazy {
-        ViewModelProviders.of(this, viewModelFactory).get(OnboardingViewModel::class.java)
-    }
+    private val viewModel: OnboardingViewModel by bindViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,11 +58,6 @@ class OnboardingActivity : DuckDuckGoActivity() {
             viewModel.onOnboardingDone()
             finish()
         }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.N)
-    fun onLaunchDefaultBrowserSettingsClicked(view: View) {
-        launchDefaultAppActivity()
     }
 
     private fun configurePager() {

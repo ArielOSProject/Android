@@ -29,9 +29,10 @@ interface TrackerDetector {
     fun evaluate(url: String, documentUrl: String, resourceType: ResourceType): TrackingEvent?
 }
 
-class TrackerDetectorImpl (
-        private val networkTrackers: TrackerNetworks,
-        private val settings: PrivacySettingsStore) :TrackerDetector {
+class TrackerDetectorImpl(
+    private val networkTrackers: TrackerNetworks,
+    private val settings: PrivacySettingsStore
+) : TrackerDetector {
 
     private val clients = CopyOnWriteArrayList<Client>()
 
@@ -67,10 +68,13 @@ class TrackerDetectorImpl (
     }
 
     private fun firstParty(firstUrl: String, secondUrl: String): Boolean =
-            sameOrSubdomain(firstUrl, secondUrl) || sameOrSubdomain(secondUrl, firstUrl) || sameNetworkName(firstUrl, secondUrl)
+        sameOrSubdomain(firstUrl, secondUrl) || sameOrSubdomain(secondUrl, firstUrl) || sameNetworkName(firstUrl, secondUrl)
 
-    private fun sameNetworkName(firstUrl: String, secondUrl: String): Boolean =
-            networkTrackers.network(firstUrl) != null && networkTrackers.network(firstUrl)?.name == networkTrackers.network(secondUrl)?.name
+    private fun sameNetworkName(firstUrl: String, secondUrl: String): Boolean {
+        val firstNetwork = networkTrackers.network(firstUrl) ?: return false
+        val secondNetwork = networkTrackers.network(secondUrl) ?: return false
+        return firstNetwork.name == secondNetwork.name
+    }
 
 
     val clientCount get() = clients.count()

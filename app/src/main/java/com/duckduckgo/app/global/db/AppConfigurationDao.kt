@@ -16,9 +16,9 @@
 
 package com.duckduckgo.app.global.db
 
-import android.arch.lifecycle.LiveData
-import android.arch.persistence.room.*
-import android.support.annotation.CheckResult
+import androidx.annotation.CheckResult
+import androidx.lifecycle.LiveData
+import androidx.room.*
 import com.duckduckgo.app.global.db.AppConfigurationDao.Companion.KEY
 import org.intellij.lang.annotations.Language
 
@@ -43,7 +43,7 @@ interface AppConfigurationDao {
 
 @Entity(tableName = "app_configuration")
 data class AppConfigurationEntity(
-        @PrimaryKey val key: String = KEY,
-        val appConfigurationDownloaded: Boolean
+    @PrimaryKey val key: String = KEY,
+    val appConfigurationDownloaded: Boolean
 
 )

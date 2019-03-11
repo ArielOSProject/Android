@@ -17,17 +17,16 @@
 package com.duckduckgo.app.privacy.ui
 
 import android.net.Uri
-import android.support.v7.util.DiffUtil
-import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.RecyclerView
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.baseHost
 import com.duckduckgo.app.privacy.renderer.TrackersRenderer
-import com.duckduckgo.app.trackerdetection.model.TrackerNetworks
 import com.duckduckgo.app.trackerdetection.model.TrackingEvent
 import kotlinx.android.synthetic.main.item_tracker_network_element.view.*
 import kotlinx.android.synthetic.main.item_tracker_network_header.view.*
@@ -44,13 +43,17 @@ class TrackerNetworksAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     data class Header(val networkName: String) : ViewData
     data class Row(val tracker: TrackingEvent) : ViewData
 
-    class HeaderViewHolder(val root: View,
-                           val network: TextView,
-                           val icon: ImageView) : RecyclerView.ViewHolder(root)
+    class HeaderViewHolder(
+        val root: View,
+        val network: TextView,
+        val icon: ImageView
+    ) : RecyclerView.ViewHolder(root)
 
-    class RowViewHolder(val root: View,
-                        val host: TextView,
-                        val category: TextView) : RecyclerView.ViewHolder(root)
+    class RowViewHolder(
+        val root: View,
+        val host: TextView,
+        val category: TextView
+    ) : RecyclerView.ViewHolder(root)
 
     private var viewData: List<ViewData> = ArrayList()
     private var networkRenderer: TrackersRenderer = TrackersRenderer()
@@ -99,7 +102,7 @@ class TrackerNetworksAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     }
 
     fun updateData(data: Map<String, List<TrackingEvent>>) {
-        val majorNetworkKeys = TrackerNetworks.majorNetworks.map { it.name }.filter { data.containsKey(it) }
+        val majorNetworkKeys = data.map { if (it.value.find { it.trackerNetwork?.isMajor == true } != null) it.key else null }.filterNotNull()
         val otherKeys = data.keys.filter { !majorNetworkKeys.contains(it) }.sorted()
 
         val oldViewData = viewData

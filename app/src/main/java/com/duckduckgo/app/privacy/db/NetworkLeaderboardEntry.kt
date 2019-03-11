@@ -16,10 +16,13 @@
 
 package com.duckduckgo.app.privacy.db
 
-import android.arch.persistence.room.Entity
+import androidx.room.Entity
 
-@Entity(tableName = "network_leaderboard",
-        primaryKeys = ["networkName", "domainVisited"])
+@Entity(
+    tableName = "network_leaderboard",
+    primaryKeys = ["networkName", "domainVisited"]
+)
 data class NetworkLeaderboardEntry(
-        val networkName: String,
-        val domainVisited: String)
+    val networkName: String,
+    val domainVisited: String
+)

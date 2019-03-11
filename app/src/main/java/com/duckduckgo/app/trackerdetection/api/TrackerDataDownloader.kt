@@ -18,12 +18,12 @@ package com.duckduckgo.app.trackerdetection.api
 
 import com.duckduckgo.app.global.api.isCached
 import com.duckduckgo.app.global.db.AppDatabase
+import com.duckduckgo.app.global.store.BinaryDataStore
 import com.duckduckgo.app.trackerdetection.AdBlockClient
 import com.duckduckgo.app.trackerdetection.Client
 import com.duckduckgo.app.trackerdetection.Client.ClientName.*
 import com.duckduckgo.app.trackerdetection.TrackerDataLoader
 import com.duckduckgo.app.trackerdetection.db.TrackerDataDao
-import com.duckduckgo.app.global.store.BinaryDataStore
 import io.reactivex.Completable
 import okhttp3.ResponseBody
 import retrofit2.Call
@@ -37,13 +37,14 @@ class TrackerDataDownloader @Inject constructor(
     private val binaryDataStore: BinaryDataStore,
     private val trackerDataLoader: TrackerDataLoader,
     private val trackerDataDao: TrackerDataDao,
-    private val appDatabase: AppDatabase) {
+    private val appDatabase: AppDatabase
+) {
 
     fun downloadList(clientName: Client.ClientName): Completable {
 
         return when (clientName) {
             DISCONNECT -> downloadDisconnectList()
-            TRACKERSWHITELIST -> downloadAdblockList(clientName, { trackerListService.trackersWhitelist() })
+            TRACKERSWHITELIST -> downloadAdblockList(clientName) { trackerListService.trackersWhitelist() }
             EASYLIST, EASYPRIVACY -> removeLegacyList(clientName)
         }
     }

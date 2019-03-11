@@ -16,8 +16,8 @@
 
 package com.duckduckgo.app.di
 
-import android.arch.persistence.room.Room
 import android.content.Context
+import androidx.room.Room
 import com.duckduckgo.app.global.db.AppDatabase
 import dagger.Module
 import dagger.Provides
@@ -31,7 +31,7 @@ class StubDatabaseModule {
     @Singleton
     fun provideDatabase(context: Context): AppDatabase {
         return Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-                .allowMainThreadQueries()
-                .build()
+            .allowMainThreadQueries()
+            .build()
     }
 }

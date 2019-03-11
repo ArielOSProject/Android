@@ -17,13 +17,14 @@
 package com.duckduckgo.app.tabs.ui
 
 import android.content.Context
-import android.support.v7.widget.RecyclerView
-import android.support.v7.widget.RecyclerView.Adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.DrawableRes
+import androidx.recyclerview.widget.RecyclerView.Adapter
+import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.image.GlideApp
 import com.duckduckgo.app.tabs.model.TabEntity
@@ -33,11 +34,12 @@ import kotlinx.android.synthetic.main.item_tab.view.*
 class TabSwitcherAdapter(private val context: Context, private val itemClickListener: TabSwitchedListener) : Adapter<TabViewHolder>() {
 
     private var data: List<TabEntity> = ArrayList()
+    private var selectedTab: TabEntity? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TabViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         val root = inflater.inflate(R.layout.item_tab, parent, false)
-        return TabViewHolder(root, root.favicon, root.title, root.url, root.close)
+        return TabViewHolder(root, root.favicon, root.title, root.url, root.close, root.tabUnread)
     }
 
     override fun getItemCount(): Int {
@@ -49,6 +51,8 @@ class TabSwitcherAdapter(private val context: Context, private val itemClickList
         val tab = data[position]
         holder.title.text = tab.displayTitle(context)
         holder.url.text = tab.displayUrl()
+        holder.tabUnread.visibility = if (tab.viewed) View.INVISIBLE else View.VISIBLE
+        holder.root.setBackgroundResource(if (tab.tabId == selectedTab?.tabId) SELECTED_BACKGROUND else DEFAULT_BACKGROUND)
 
         GlideApp.with(holder.root)
             .load(tab.favicon())
@@ -68,8 +72,12 @@ class TabSwitcherAdapter(private val context: Context, private val itemClickList
         }
     }
 
-    fun updateData(data: List<TabEntity>) {
+    fun updateData(data: List<TabEntity>?, selectedTab: TabEntity?) {
+
+        data ?: return
+
         this.data = data
+        this.selectedTab = selectedTab
         notifyDataSetChanged()
     }
 
@@ -84,6 +92,16 @@ class TabSwitcherAdapter(private val context: Context, private val itemClickList
         val favicon: ImageView,
         val title: TextView,
         val url: TextView,
-        val close: ImageView
-    ) : RecyclerView.ViewHolder(root)
+        val close: ImageView,
+        val tabUnread: View
+    ) : ViewHolder(root)
+
+    companion object {
+
+        @DrawableRes
+        private const val SELECTED_BACKGROUND = R.drawable.tab_background_selected
+        @DrawableRes
+        private const val DEFAULT_BACKGROUND = R.drawable.tab_background
+    }
+
 }

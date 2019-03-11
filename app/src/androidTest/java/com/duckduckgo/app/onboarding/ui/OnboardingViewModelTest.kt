@@ -16,16 +16,13 @@
 
 package com.duckduckgo.app.onboarding.ui
 
-import android.arch.core.executor.testing.InstantTaskExecutorRule
-import com.duckduckgo.app.browser.defaultBrowsing.DefaultBrowserDetector
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
 import com.duckduckgo.app.onboarding.store.OnboardingStore
-import com.duckduckgo.app.statistics.Variant
-import com.duckduckgo.app.statistics.VariantManager
-import com.duckduckgo.app.statistics.VariantManager.VariantFeature.DefaultBrowserFeature.ShowInOnboarding
-import com.nhaarman.mockito_kotlin.mock
-import com.nhaarman.mockito_kotlin.never
-import com.nhaarman.mockito_kotlin.verify
-import com.nhaarman.mockito_kotlin.whenever
+import com.nhaarman.mockitokotlin2.mock
+import com.nhaarman.mockitokotlin2.never
+import com.nhaarman.mockitokotlin2.verify
+import com.nhaarman.mockitokotlin2.whenever
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -40,10 +37,9 @@ class OnboardingViewModelTest {
 
     private var onboardingStore: OnboardingStore = mock()
     private var mockDefaultBrowserDetector: DefaultBrowserDetector = mock()
-    private var variantManager: VariantManager = mock()
 
     private val testee: OnboardingViewModel by lazy {
-        OnboardingViewModel(onboardingStore, mockDefaultBrowserDetector, variantManager)
+        OnboardingViewModel(onboardingStore, mockDefaultBrowserDetector)
     }
 
     @Test
@@ -66,33 +62,17 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun whenThirdPageRequestedWithFeatureEnabledAndDefaultBrowserCapableThenDefaultBrowserPageReturned() {
-        whenever(variantManager.getVariant()).thenReturn(variantWithOnboardingEnabled())
+    fun whenThirdPageRequestedWithDefaultBrowserCapableThenDefaultBrowserPageReturned() {
         whenever(mockDefaultBrowserDetector.deviceSupportsDefaultBrowserConfiguration()).thenReturn(true)
         val page = testee.getItem(2)
         assertTrue(page is OnboardingPageFragment.DefaultBrowserPage)
     }
 
     @Test
-    fun whenThirdPageRequestedWithFeatureDisabledAndDefaultBrowserCapableThenNoPageReturned() {
-        whenever(variantManager.getVariant()).thenReturn(variantWithOnboardingDisabled())
-        whenever(mockDefaultBrowserDetector.deviceSupportsDefaultBrowserConfiguration()).thenReturn(true)
-        val page = testee.getItem(2)
-        assertNull(page)
-    }
-
-    @Test
     fun whenThirdPageRequestedButDefaultBrowserNotCapableThenNoPageReturned() {
-        whenever(variantManager.getVariant()).thenReturn(variantWithOnboardingEnabled())
         whenever(mockDefaultBrowserDetector.deviceSupportsDefaultBrowserConfiguration()).thenReturn(false)
         val page = testee.getItem(2)
         assertNull(page)
     }
-
-    private fun variantWithOnboardingEnabled(): Variant =
-        Variant("", 0.0, listOf(ShowInOnboarding))
-
-    private fun variantWithOnboardingDisabled(): Variant =
-        Variant("", 0.0, listOf())
 
 }

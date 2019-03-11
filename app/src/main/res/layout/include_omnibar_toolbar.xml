@@ -1,4 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
   ~ Copyright (c) 2018 DuckDuckGo
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,46 +21,48 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:parentTag="android.support.design.widget.CoordinatorLayout">
+    tools:parentTag="androidx.coordinatorlayout.widget.CoordinatorLayout">
 
-    <android.support.design.widget.AppBarLayout
+    <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:fitsSystemWindows="true"
-        android:theme="@style/AppTheme.AppBarOverlay"
+        android:theme="@style/AppTheme.Dark.AppBarOverlay"
         app:layout_scrollFlags="scroll|enterAlways">
 
-        <android.support.constraint.ConstraintLayout
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/toolbarContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:theme="@style/OmnibarToolbarTheme"
             app:layout_scrollFlags="scroll|enterAlways">
 
-            <android.support.v7.widget.Toolbar
+            <androidx.appcompat.widget.Toolbar
                 android:id="@+id/toolbar"
                 android:layout_width="0dp"
                 android:layout_height="?attr/actionBarSize"
-                android:background="@color/colorPrimary"
+                android:background="?attr/colorPrimary"
                 app:contentInsetEnd="0dp"
                 app:contentInsetStart="0dp"
                 app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/browserMenu"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_scrollFlags="scroll|enterAlways"
-                app:popupTheme="@style/AppTheme.PopupOverlay">
+                app:popupTheme="@style/AppTheme.Dark.PopupOverlay">
 
-                <android.support.constraint.ConstraintLayout
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/omniBarContainer"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_marginBottom="8dp"
-                    android:layout_marginEnd="5dp"
                     android:layout_marginStart="5dp"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/omnibar_editing_background"
-                    android:paddingEnd="6dp"
-                    android:paddingStart="6dp">
+                    android:layout_marginEnd="5dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/omnibar_field_background"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp">
 
                     <ImageButton
                         android:id="@+id/privacyGradeButton"
@@ -77,8 +81,8 @@
                         style="@style/Base.V7.Widget.AppCompat.EditText"
                         android:layout_width="0dp"
                         android:layout_height="0dp"
-                        android:layout_marginEnd="8dp"
                         android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
                         android:background="@android:color/transparent"
                         android:fontFamily="sans-serif-medium"
                         android:hint="@string/omnibarInputHint"
@@ -86,7 +90,9 @@
                         android:inputType="textUri|textNoSuggestions"
                         android:maxLines="1"
                         android:selectAllOnFocus="true"
-                        android:textColor="@color/white"
+                        android:textColor="?attr/omnibarTextColor"
+                        android:textColorHint="?attr/omnibarHintColor"
+                        android:textCursorDrawable="@null"
                         android:textSize="13sp"
                         android:textStyle="normal"
                         app:layout_constraintBottom_toBottomOf="parent"
@@ -102,17 +108,38 @@
                         android:background="?selectableItemBackground"
                         android:contentDescription="@string/clearButtonContentDescription"
                         android:padding="3dp"
-                        android:src="@drawable/ic_close_white_24dp"
-                        android:tint="@color/grayish"
+                        android:src="@drawable/ic_close_24dp"
                         android:visibility="gone"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
                         tools:visibility="visible" />
 
-                </android.support.constraint.ConstraintLayout>
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
-            </android.support.v7.widget.Toolbar>
+            </androidx.appcompat.widget.Toolbar>
+
+            <FrameLayout
+                android:id="@+id/browserMenu"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:paddingStart="9dp"
+                android:paddingEnd="13dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                tools:visibility="gone">
+
+                <ImageView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/browserPopupMenu"
+                    android:padding="3dp"
+                    android:src="@drawable/ic_overflow_12dp" />
+
+            </FrameLayout>
 
             <ProgressBar
                 android:id="@+id/pageLoadingIndicator"
@@ -135,8 +162,9 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-        </android.support.constraint.ConstraintLayout>
 
-    </android.support.design.widget.AppBarLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
 
 </merge>

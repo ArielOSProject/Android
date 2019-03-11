@@ -18,6 +18,13 @@ package com.duckduckgo.app.di
 
 import android.app.NotificationManager
 import android.content.Context
+import androidx.core.app.NotificationManagerCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.duckduckgo.app.notification.NotificationFactory
+import com.duckduckgo.app.notification.NotificationScheduler
+import com.duckduckgo.app.notification.db.NotificationDao
+import com.duckduckgo.app.settings.db.SettingsDataStore
+import com.duckduckgo.app.statistics.VariantManager
 import dagger.Module
 import dagger.Provides
 import javax.inject.Singleton
@@ -31,4 +38,31 @@ class NotificationModule {
         return context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
+    @Provides
+    @Singleton
+    fun provideNotificationManagerCompat(context: Context): NotificationManagerCompat {
+        return NotificationManagerCompat.from(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideLocalBroadcastManager(context: Context): LocalBroadcastManager {
+        return LocalBroadcastManager.getInstance(context)
+    }
+
+    @Provides
+    @Singleton
+    fun providesNotificationScheduler(
+        notificationDao: NotificationDao,
+        notificationManager: NotificationManagerCompat,
+        settingsDataStore: SettingsDataStore
+    ): NotificationScheduler {
+        return NotificationScheduler(notificationDao, notificationManager, settingsDataStore)
+    }
+
+    @Provides
+    @Singleton
+    fun providesNotificationFactory(context: Context, manager: NotificationManagerCompat): NotificationFactory {
+        return NotificationFactory(context, manager)
+    }
 }

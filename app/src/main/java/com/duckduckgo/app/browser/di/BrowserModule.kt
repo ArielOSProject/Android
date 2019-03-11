@@ -16,17 +16,25 @@
 
 package com.duckduckgo.app.browser.di
 
+import android.content.ClipboardManager
 import android.content.Context
+import android.webkit.CookieManager
 import com.duckduckgo.app.browser.*
-import com.duckduckgo.app.browser.defaultBrowsing.AndroidDefaultBrowserDetector
-import com.duckduckgo.app.browser.defaultBrowsing.DefaultBrowserDetector
+import com.duckduckgo.app.browser.addtohome.AddToHomeCapabilityDetector
+import com.duckduckgo.app.browser.addtohome.AddToHomeSystemCapabilityDetector
+import com.duckduckgo.app.browser.defaultbrowsing.AndroidDefaultBrowserDetector
+import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.browser.session.WebViewSessionStorage
+import com.duckduckgo.app.fire.DuckDuckGoCookieManager
+import com.duckduckgo.app.fire.WebViewCookieManager
 import com.duckduckgo.app.global.AppUrl
-import com.duckduckgo.app.global.install.AppInstallStore
+import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
+import com.duckduckgo.app.surrogates.ResourceSurrogates
+import com.duckduckgo.app.trackerdetection.TrackerDetector
 import dagger.Module
 import dagger.Provides
 import javax.inject.Singleton
@@ -44,13 +52,13 @@ class BrowserModule {
     }
 
     @Provides
-    fun webViewLongPressHandler(pixel: Pixel): LongPressHandler {
-        return WebViewLongPressHandler(pixel)
+    fun webViewLongPressHandler(context: Context, pixel: Pixel): LongPressHandler {
+        return WebViewLongPressHandler(context, pixel)
     }
 
     @Provides
-    fun defaultWebBrowserCapability(context: Context, appInstallStore: AppInstallStore): DefaultBrowserDetector {
-        return AndroidDefaultBrowserDetector(context, appInstallStore)
+    fun defaultWebBrowserCapability(context: Context): DefaultBrowserDetector {
+        return AndroidDefaultBrowserDetector(context)
     }
 
     @Singleton
@@ -59,5 +67,37 @@ class BrowserModule {
 
     @Singleton
     @Provides
-    fun webDataManager(webViewSessionStorage: WebViewSessionStorage) = WebDataManager(AppUrl.Url.HOST, webViewSessionStorage)
+    fun webDataManager(webViewSessionStorage: WebViewSessionStorage, cookieManager: DuckDuckGoCookieManager): WebDataManager =
+        WebViewDataManager(webViewSessionStorage, cookieManager)
+
+    @Provides
+    fun clipboardManager(context: Context): ClipboardManager {
+        return context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    }
+
+    @Provides
+    fun addToHomeCapabilityDetector(context: Context): AddToHomeCapabilityDetector {
+        return AddToHomeSystemCapabilityDetector(context)
+    }
+
+    @Provides
+    fun specialUrlDetector(): SpecialUrlDetector = SpecialUrlDetectorImpl()
+
+    @Provides
+    fun webViewRequestInterceptor(
+        resourceSurrogates: ResourceSurrogates,
+        trackerDetector: TrackerDetector,
+        httpsUpgrader: HttpsUpgrader
+    ): RequestInterceptor = WebViewRequestInterceptor(resourceSurrogates, trackerDetector, httpsUpgrader)
+
+    @Provides
+    fun cookieManager(cookieManager: CookieManager): DuckDuckGoCookieManager {
+        return WebViewCookieManager(cookieManager, AppUrl.Url.HOST)
+    }
+
+    @Singleton
+    @Provides
+    fun webViewCookieManager(): CookieManager {
+        return CookieManager.getInstance()
+    }
 }

@@ -16,8 +16,8 @@
 
 package com.duckduckgo.app.tabs.model
 
-import android.arch.lifecycle.LiveData
-import android.arch.lifecycle.MutableLiveData
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import com.duckduckgo.app.global.model.Site
 
 interface TabRepository {
@@ -29,9 +29,11 @@ interface TabRepository {
     /**
      * @return tabId of new record
      */
-    fun add(url: String? = null): String
+    fun add(url: String? = null, isDefaultTab: Boolean = false): String
 
-    fun add(tabId: String, data: MutableLiveData<Site>)
+    fun addNewTabAfterExistingTab(url: String? = null, tabId: String)
+
+    fun add(tabId: String, data: MutableLiveData<Site>, isDefaultTab: Boolean = false)
 
     fun update(tabId: String, site: Site?)
 

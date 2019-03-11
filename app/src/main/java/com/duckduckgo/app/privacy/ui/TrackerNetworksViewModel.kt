@@ -16,18 +16,18 @@
 
 package com.duckduckgo.app.privacy.ui
 
-import android.arch.lifecycle.MutableLiveData
-import android.arch.lifecycle.ViewModel
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import com.duckduckgo.app.global.model.Site
 import com.duckduckgo.app.trackerdetection.model.TrackingEvent
 
 class TrackerNetworksViewModel : ViewModel() {
 
     data class ViewState(
-            val domain: String,
-            val allTrackersBlocked: Boolean,
-            val networkCount: Int,
-            val trackingEventsByNetwork: Map<String, List<TrackingEvent>>
+        val domain: String,
+        val allTrackersBlocked: Boolean,
+        val trackerCount: Int,
+        val trackingEventsByNetwork: Map<String, List<TrackingEvent>>
     )
 
     val viewState: MutableLiveData<ViewState> = MutableLiveData()
@@ -38,10 +38,10 @@ class TrackerNetworksViewModel : ViewModel() {
 
     private fun resetViewState() {
         viewState.value = ViewState(
-                domain = "",
-                networkCount = 0,
-                allTrackersBlocked = true,
-                trackingEventsByNetwork = HashMap()
+            domain = "",
+            trackerCount = 0,
+            allTrackersBlocked = true,
+            trackingEventsByNetwork = HashMap()
         )
     }
 
@@ -51,10 +51,10 @@ class TrackerNetworksViewModel : ViewModel() {
             return
         }
         viewState.value = viewState.value?.copy(
-                domain = site.uri?.host ?: "",
-                networkCount = site.networkCount,
-                allTrackersBlocked = site.allTrackersBlocked,
-                trackingEventsByNetwork = site.distinctTrackersByNetwork
+            domain = site.uri?.host ?: "",
+            trackerCount = site.trackerCount,
+            allTrackersBlocked = site.allTrackersBlocked,
+            trackingEventsByNetwork = site.distinctTrackersByNetwork
         )
     }
 }

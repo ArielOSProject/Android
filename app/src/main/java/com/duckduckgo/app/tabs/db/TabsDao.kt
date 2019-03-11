@@ -16,8 +16,8 @@
 
 package com.duckduckgo.app.tabs.db
 
-import android.arch.lifecycle.LiveData
-import android.arch.persistence.room.*
+import androidx.lifecycle.LiveData
+import androidx.room.*
 import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.model.TabSelectionEntity
 import javax.inject.Singleton
@@ -26,19 +26,19 @@ import javax.inject.Singleton
 @Singleton
 abstract class TabsDao {
 
-    @Query("select * from tabs limit 1")
+    @Query("select * from tabs order by position limit 1")
     abstract fun firstTab(): TabEntity?
 
-    @Query("select tabs.tabId, url, title from tabs inner join tab_selection ON tabs.tabId = tab_selection.tabId limit 1")
+    @Query("select * from tabs inner join tab_selection on tabs.tabId = tab_selection.tabId order by position limit 1")
     abstract fun selectedTab(): TabEntity?
 
-    @Query("select tabs.tabId, url, title from tabs inner join tab_selection ON tabs.tabId = tab_selection.tabId limit 1")
+    @Query("select * from tabs inner join tab_selection on tabs.tabId = tab_selection.tabId order by position limit 1")
     abstract fun liveSelectedTab(): LiveData<TabEntity>
 
-    @Query("select * from tabs")
+    @Query("select * from tabs order by position")
     abstract fun tabs(): List<TabEntity>
 
-    @Query("select * from tabs")
+    @Query("select * from tabs order by position")
     abstract fun liveTabs(): LiveData<List<TabEntity>>
 
     @Query("select * from tabs where tabId = :tabId")
@@ -56,8 +56,11 @@ abstract class TabsDao {
     @Query("delete from tabs")
     abstract fun deleteAllTabs()
 
-    @Query("delete from tabs where url IS null")
+    @Query("delete from tabs where url is null")
     abstract fun deleteBlankTabs()
+
+    @Query("update tabs set position = position + 1 where position >= :position")
+    abstract fun incrementPositionStartingAt(position: Int)
 
     @Transaction
     open fun addAndSelectTab(tab: TabEntity) {
@@ -81,4 +84,15 @@ abstract class TabsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract fun insertTabSelection(tabSelectionEntity: TabSelectionEntity)
+
+    @Transaction
+    open fun insertTabAtPosition(tab: TabEntity) {
+        incrementPositionStartingAt(tab.position)
+        insertTab(tab)
+    }
+
+    fun lastTab(): TabEntity? {
+        return tabs().lastOrNull()
+    }
+
 }

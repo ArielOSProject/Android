@@ -16,20 +16,29 @@
 
 package com.duckduckgo.app.di
 
+import com.duckduckgo.app.about.AboutDuckDuckGoActivity
 import com.duckduckgo.app.bookmarks.ui.BookmarksActivity
 import com.duckduckgo.app.browser.BrowserActivity
 import com.duckduckgo.app.browser.BrowserTabFragment
-import com.duckduckgo.app.browser.defaultBrowsing.DefaultBrowserInfoActivity
+import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserInfoActivity
+import com.duckduckgo.app.browser.rating.ui.AppEnjoymentDialogFragment
+import com.duckduckgo.app.browser.rating.ui.GiveFeedbackDialogFragment
+import com.duckduckgo.app.browser.rating.ui.RateAppDialogFragment
 import com.duckduckgo.app.feedback.ui.FeedbackActivity
+import com.duckduckgo.app.feedback.ui.SurveyActivity
+import com.duckduckgo.app.fire.FireActivity
 import com.duckduckgo.app.job.AppConfigurationJobService
 import com.duckduckgo.app.launch.LaunchActivity
+import com.duckduckgo.app.notification.NotificationHandlerService
 import com.duckduckgo.app.onboarding.ui.OnboardingActivity
+import com.duckduckgo.app.onboarding.ui.OnboardingPageFragment
 import com.duckduckgo.app.privacy.ui.PrivacyDashboardActivity
 import com.duckduckgo.app.privacy.ui.PrivacyPracticesActivity
 import com.duckduckgo.app.privacy.ui.ScorecardActivity
 import com.duckduckgo.app.privacy.ui.TrackerNetworksActivity
 import com.duckduckgo.app.settings.SettingsActivity
 import com.duckduckgo.app.tabs.ui.TabSwitcherActivity
+import com.duckduckgo.app.widget.ui.AddWidgetInstructionsActivity
 import dagger.Module
 import dagger.android.ContributesAndroidInjector
 
@@ -77,6 +86,14 @@ abstract class AndroidBindingModule {
 
     @ActivityScoped
     @ContributesAndroidInjector
+    abstract fun userSurveyActivity(): SurveyActivity
+
+    @ActivityScoped
+    @ContributesAndroidInjector
+    abstract fun addWidgetInstructionsActivity(): AddWidgetInstructionsActivity
+
+    @ActivityScoped
+    @ContributesAndroidInjector
     abstract fun settingsActivity(): SettingsActivity
 
     @ActivityScoped
@@ -87,13 +104,37 @@ abstract class AndroidBindingModule {
     @ContributesAndroidInjector
     abstract fun defaultBrowserInfoActivity(): DefaultBrowserInfoActivity
 
+    @ActivityScoped
+    @ContributesAndroidInjector
+    abstract fun fireActivity(): FireActivity
+
+    @ActivityScoped
+    @ContributesAndroidInjector
+    abstract fun aboutDuckDuckGoActivity(): AboutDuckDuckGoActivity
+
     /* Fragments */
 
     @ContributesAndroidInjector
     abstract fun browserTabFragment(): BrowserTabFragment
 
+    @ContributesAndroidInjector
+    abstract fun onboardingDefaultBrowserFragment(): OnboardingPageFragment.DefaultBrowserPage
+
+    @ContributesAndroidInjector
+    abstract fun appEnjoymentDialogFragment(): AppEnjoymentDialogFragment
+
+    @ContributesAndroidInjector
+    abstract fun giveFeedbackDialogFragment(): GiveFeedbackDialogFragment
+
+    @ContributesAndroidInjector
+    abstract fun rateAppDialogFragment(): RateAppDialogFragment
+
+
     /* Services */
 
     @ContributesAndroidInjector
     abstract fun jobService(): AppConfigurationJobService
+
+    @ContributesAndroidInjector
+    abstract fun notificationHandlerService(): NotificationHandlerService
 }

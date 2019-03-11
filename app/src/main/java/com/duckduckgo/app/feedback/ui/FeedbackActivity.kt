@@ -16,33 +16,25 @@
 
 package com.duckduckgo.app.feedback.ui
 
-import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.widget.EditText
 import androidx.core.view.isVisible
+import androidx.lifecycle.Observer
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.feedback.ui.FeedbackViewModel.Command
 import com.duckduckgo.app.feedback.ui.FeedbackViewModel.ViewState
 import com.duckduckgo.app.global.DuckDuckGoActivity
-import com.duckduckgo.app.global.ViewModelFactory
 import com.duckduckgo.app.global.view.TextChangedWatcher
 import kotlinx.android.synthetic.main.activity_feedback.*
 import org.jetbrains.anko.longToast
-import javax.inject.Inject
 
 
 class FeedbackActivity : DuckDuckGoActivity() {
 
-    @Inject
-    lateinit var viewModelFactory: ViewModelFactory
-
-    private val viewModel: FeedbackViewModel by lazy {
-        ViewModelProviders.of(this, viewModelFactory).get(FeedbackViewModel::class.java)
-    }
+    private val viewModel: FeedbackViewModel by bindViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,7 +69,7 @@ class FeedbackActivity : DuckDuckGoActivity() {
                 viewModel.onBrokenSiteUrlChanged(editable.toString())
             }
         })
-        submitButton.setOnClickListener { _ ->
+        submitButton.setOnClickListener {
             viewModel.onSubmitPressed()
         }
     }
@@ -101,11 +93,11 @@ class FeedbackActivity : DuckDuckGoActivity() {
 
     private fun confirmAndFinish() {
         longToast(R.string.feedbackSubmitted)
-        finish()
+        finishAfterTransition()
     }
 
     private fun render(viewState: ViewState) {
-        val messageHint = if (viewState.isBrokenSite) R.string.feedbackBrokenSiteHint else  R.string.feedbackMessageHint
+        val messageHint = if (viewState.isBrokenSite) R.string.feedbackBrokenSiteHint else R.string.feedbackMessageHint
         brokenSiteSwitch.isChecked = viewState.isBrokenSite
         brokenSiteUrl.isVisible = viewState.showUrl
         brokenSiteUrl.updateText(viewState.url ?: "")

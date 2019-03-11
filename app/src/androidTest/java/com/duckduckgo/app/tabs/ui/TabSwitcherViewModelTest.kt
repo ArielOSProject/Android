@@ -16,14 +16,14 @@
 
 package com.duckduckgo.app.tabs.ui
 
-import android.arch.core.executor.testing.InstantTaskExecutorRule
-import android.arch.lifecycle.Observer
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.Observer
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.model.TabRepository
 import com.duckduckgo.app.tabs.ui.TabSwitcherViewModel.Command
-import com.nhaarman.mockito_kotlin.*
+import com.nhaarman.mockitokotlin2.*
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -68,7 +68,7 @@ class TabSwitcherViewModelTest {
 
     @Test
     fun whenTabSelectedThenRepositoryNotifiedAndSwitcherClosed() {
-        testee.onTabSelected(TabEntity("abc", "", ""))
+        testee.onTabSelected(TabEntity("abc", "", "", position = 0))
         verify(mockTabRepository).select(eq("abc"))
         verify(mockCommandObserver).onChanged(commandCaptor.capture())
         assertEquals(Command.Close, commandCaptor.lastValue)
@@ -76,15 +76,9 @@ class TabSwitcherViewModelTest {
 
     @Test
     fun whenTabDeletedThenRepositoryNotified() {
-        val entity = TabEntity("abc", "", "")
+        val entity = TabEntity("abc", "", "", position = 0)
         testee.onTabDeleted(entity)
         verify(mockTabRepository).delete(entity)
-    }
-
-    @Test
-    fun whenClearRequestedThenDeleteAllCalledOnRepository() {
-        testee.onClearRequested()
-        verify(mockTabRepository).deleteAll()
     }
 
     @Test

@@ -17,7 +17,7 @@
 package com.duckduckgo.app.privacy.renderer
 
 import android.content.Context
-import android.support.annotation.DrawableRes
+import androidx.annotation.DrawableRes
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao.NetworkTally
 
@@ -27,11 +27,6 @@ class TrackersRenderer {
     fun trackersText(context: Context, trackerCount: Int, allTrackersBlocked: Boolean): String {
         val resource = if (allTrackersBlocked) R.plurals.trackerBlocked else R.plurals.trackersFound
         return context.resources.getQuantityString(resource, trackerCount, trackerCount)
-    }
-
-    fun networksText(context: Context, networkCount: Int, allTrackersBlocked: Boolean): String {
-        val resource = if (allTrackersBlocked) R.plurals.networksBlocked else R.plurals.networksFound
-        return context.resources.getQuantityString(resource, networkCount, networkCount)
     }
 
     fun majorNetworksText(context: Context, networkCount: Int, allTrackersBlocked: Boolean): String {
@@ -61,9 +56,9 @@ class TrackersRenderer {
 
     private fun networkIcon(context: Context, networkName: String, prefix: String): Int? {
         val drawable = "$prefix$networkName"
-                .replace(" ", "")
-                .replace(".", "")
-                .toLowerCase()
+            .replace(" ", "")
+            .replace(".", "")
+            .toLowerCase()
         val resource = context.resources.getIdentifier(drawable, "drawable", context.packageName)
         return if (resource != 0) resource else null
     }
@@ -79,5 +74,5 @@ class TrackersRenderer {
         0 -> R.drawable.icon_success
         else -> R.drawable.icon_fail
     }
-    
+
 }

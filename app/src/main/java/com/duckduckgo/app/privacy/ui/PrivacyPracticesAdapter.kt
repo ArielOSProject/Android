@@ -16,13 +16,12 @@
 
 package com.duckduckgo.app.privacy.ui
 
-import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-
 import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
 import com.duckduckgo.app.browser.R
 import kotlinx.android.synthetic.main.item_privacy_practice.view.*
 
@@ -57,9 +56,11 @@ class PrivacyPracticesAdapter : RecyclerView.Adapter<PrivacyPracticesAdapter.Pra
         notifyDataSetChanged()
     }
 
-    class PracticeViewHolder(val root: View,
-                             val icon: ImageView,
-                             val description: TextView) : RecyclerView.ViewHolder(root)
+    class PracticeViewHolder(
+        val root: View,
+        val icon: ImageView,
+        val description: TextView
+    ) : RecyclerView.ViewHolder(root)
 
 }
 

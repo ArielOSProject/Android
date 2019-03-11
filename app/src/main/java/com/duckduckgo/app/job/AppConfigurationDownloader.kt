@@ -16,6 +16,8 @@
 
 package com.duckduckgo.app.job
 
+import com.duckduckgo.app.entities.api.EntityListDownloader
+import com.duckduckgo.app.feedback.api.SurveyDownloader
 import com.duckduckgo.app.global.db.AppConfigurationEntity
 import com.duckduckgo.app.global.db.AppDatabase
 import com.duckduckgo.app.httpsupgrade.api.HttpsUpgradeDataDownloader
@@ -30,27 +32,38 @@ interface ConfigurationDownloader {
 }
 
 class AppConfigurationDownloader(
-        private val trackerDataDownloader: TrackerDataDownloader,
-        private val httpsUpgradeDataDownloader: HttpsUpgradeDataDownloader,
-        private val resourceSurrogateDownloader: ResourceSurrogateListDownloader,
-        private val appDatabase: AppDatabase) : ConfigurationDownloader {
+    private val trackerDataDownloader: TrackerDataDownloader,
+    private val httpsUpgradeDataDownloader: HttpsUpgradeDataDownloader,
+    private val resourceSurrogateDownloader: ResourceSurrogateListDownloader,
+    private val entityListDownloader: EntityListDownloader,
+    private val surveyDownloader: SurveyDownloader,
+    private val appDatabase: AppDatabase
+) : ConfigurationDownloader {
 
     override fun downloadTask(): Completable {
         val easyListDownload = trackerDataDownloader.downloadList(EASYLIST)
         val easyPrivacyDownload = trackerDataDownloader.downloadList(EASYPRIVACY)
         val trackersWhitelist = trackerDataDownloader.downloadList(TRACKERSWHITELIST)
         val disconnectDownload = trackerDataDownloader.downloadList(DISCONNECT)
+        val entityListDownload = entityListDownloader.download()
         val surrogatesDownload = resourceSurrogateDownloader.downloadList()
         val httpsUpgradeDownload = httpsUpgradeDataDownloader.download()
+        val httpStatisticsReport = httpsUpgradeDataDownloader.reportUpgradeStatistics()
+        val surveyDownload = surveyDownloader.download()
 
-        return Completable.mergeDelayError(listOf(
+        return Completable.mergeDelayError(
+            listOf(
                 easyListDownload,
                 easyPrivacyDownload,
                 trackersWhitelist,
                 disconnectDownload,
+                entityListDownload,
                 surrogatesDownload,
-                httpsUpgradeDownload
-        )).doOnComplete {
+                httpsUpgradeDownload,
+                httpStatisticsReport,
+                surveyDownload
+            )
+        ).doOnComplete {
             Timber.i("Download task completed successfully")
             val appConfiguration = AppConfigurationEntity(appConfigurationDownloaded = true)
             appDatabase.appConfigurationDao().configurationDownloadSuccessful(appConfiguration)

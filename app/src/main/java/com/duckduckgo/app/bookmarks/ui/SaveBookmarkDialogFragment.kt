@@ -18,11 +18,11 @@ package com.duckduckgo.app.bookmarks.ui
 
 import android.app.Dialog
 import android.os.Bundle
-import android.support.v4.app.DialogFragment
-import android.support.v7.app.AlertDialog
 import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
+import androidx.appcompat.app.AlertDialog
+import androidx.fragment.app.DialogFragment
 import com.duckduckgo.app.bookmarks.db.BookmarkEntity
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.view.showKeyboard
@@ -61,10 +61,10 @@ class SaveBookmarkDialogFragment : DialogFragment() {
 
     private fun userAcceptedDialog(titleInput: EditText, urlInput: EditText) {
         listener?.onBookmarkSaved(
-                getExistingId(),
-                titleInput.text.toString(),
-                urlInput.text.toString()
-            )
+            getExistingId(),
+            titleInput.text.toString(),
+            urlInput.text.toString()
+        )
     }
 
     private fun showKeyboard(titleInput: EditText, alert: AlertDialog) {
@@ -96,7 +96,8 @@ class SaveBookmarkDialogFragment : DialogFragment() {
         val args = arguments!!
         if (!args.containsKey(KEY_IS_EDIT_MODE) ||
             !args.containsKey(KEY_PREEXISTING_TITLE) ||
-            !args.containsKey(KEY_PREEXISTING_URL)) {
+            !args.containsKey(KEY_PREEXISTING_URL)
+        ) {
             throw IllegalArgumentException("Bundle arguments required [KEY_IS_EDIT_MODE, KEY_PREEXISTING_TITLE, KEY_PREEXISTING_URL]")
         }
     }

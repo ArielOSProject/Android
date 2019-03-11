@@ -14,14 +14,14 @@
   ~ limitations under the License.
   -->
 
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_margin="30dp"
     android:background="@drawable/notification_info_bottom_background"
-    tools:context="com.duckduckgo.app.browser.defaultBrowsing.DefaultBrowserInfoActivity">
+    tools:context="com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserInfoActivity">
 
     <View
         android:id="@+id/titleSection"
@@ -64,8 +64,8 @@
         android:id="@+id/description"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="38dp"
         android:layout_marginTop="6dp"
+        android:layout_marginEnd="38dp"
         android:elevation="@dimen/modalCardHeaderElevation"
         android:paddingBottom="30dp"
         android:text="@string/defaultBrowserInfoMessage"
@@ -94,9 +94,9 @@
         android:id="@+id/dismissButton"
         android:layout_width="36dp"
         android:layout_height="36dp"
-        android:layout_marginEnd="6dp"
         android:layout_marginStart="14dp"
         android:layout_marginTop="6dp"
+        android:layout_marginEnd="6dp"
         android:background="?attr/selectableItemBackground"
         android:contentDescription="@string/dismissDefaultBrowserInfo"
         android:elevation="7dp"
@@ -119,18 +119,18 @@
         app:layout_constraintBottom_toBottomOf="@id/defaultBrowserIllustration"
         app:layout_constraintStart_toStartOf="@id/textStartVerticalGuideline" />
 
-    <android.support.constraint.Guideline
+    <androidx.constraintlayout.widget.Guideline
         android:id="@+id/textStartVerticalGuideline"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="vertical"
         app:layout_constraintGuide_begin="40dp" />
 
-    <android.support.constraint.Guideline
+    <androidx.constraintlayout.widget.Guideline
         android:id="@+id/textEndVerticalGuideline"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="vertical"
         app:layout_constraintGuide_percent="0.6" />
 
-</android.support.constraint.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

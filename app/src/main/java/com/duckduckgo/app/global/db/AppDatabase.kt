@@ -16,16 +16,29 @@
 
 package com.duckduckgo.app.global.db
 
-import android.arch.persistence.db.SupportSQLiteDatabase
-import android.arch.persistence.room.Database
-import android.arch.persistence.room.RoomDatabase
-import android.arch.persistence.room.migration.Migration
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.duckduckgo.app.bookmarks.db.BookmarkEntity
 import com.duckduckgo.app.bookmarks.db.BookmarksDao
+import com.duckduckgo.app.browser.rating.db.AppEnjoymentDao
+import com.duckduckgo.app.browser.rating.db.AppEnjoymentEntity
+import com.duckduckgo.app.browser.rating.db.AppEnjoymentTypeConverter
+import com.duckduckgo.app.browser.rating.db.PromptCountConverter
+import com.duckduckgo.app.cta.db.DismissedCtaDao
+import com.duckduckgo.app.cta.model.DismissedCta
+import com.duckduckgo.app.entities.db.EntityListDao
+import com.duckduckgo.app.entities.db.EntityListEntity
+import com.duckduckgo.app.feedback.db.SurveyDao
+import com.duckduckgo.app.feedback.model.Survey
 import com.duckduckgo.app.httpsupgrade.db.HttpsBloomFilterSpecDao
 import com.duckduckgo.app.httpsupgrade.db.HttpsWhitelistDao
 import com.duckduckgo.app.httpsupgrade.model.HttpsBloomFilterSpec
 import com.duckduckgo.app.httpsupgrade.model.HttpsWhitelistedDomain
+import com.duckduckgo.app.notification.db.NotificationDao
+import com.duckduckgo.app.notification.model.Notification
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardEntry
 import com.duckduckgo.app.privacy.db.SiteVisitedEntity
@@ -34,19 +47,38 @@ import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.model.TabSelectionEntity
 import com.duckduckgo.app.trackerdetection.db.TrackerDataDao
 import com.duckduckgo.app.trackerdetection.model.DisconnectTracker
+import com.duckduckgo.app.usage.app.AppDaysUsedDao
+import com.duckduckgo.app.usage.app.AppDaysUsedEntity
+import com.duckduckgo.app.usage.search.SearchCountDao
+import com.duckduckgo.app.usage.search.SearchCountEntity
 
-@Database(exportSchema = true, version = 4, entities = [
-    DisconnectTracker::class,
-    HttpsBloomFilterSpec::class,
-    HttpsWhitelistedDomain::class,
-    NetworkLeaderboardEntry::class,
-    SiteVisitedEntity::class,
-    AppConfigurationEntity::class,
-    TabEntity::class,
-    TabSelectionEntity::class,
-    BookmarkEntity::class
-])
+@Database(
+    exportSchema = true, version = 10, entities = [
+        DisconnectTracker::class,
+        HttpsBloomFilterSpec::class,
+        HttpsWhitelistedDomain::class,
+        NetworkLeaderboardEntry::class,
+        SiteVisitedEntity::class,
+        AppConfigurationEntity::class,
+        TabEntity::class,
+        TabSelectionEntity::class,
+        BookmarkEntity::class,
+        EntityListEntity::class,
+        Survey::class,
+        DismissedCta::class,
+        SearchCountEntity::class,
+        AppDaysUsedEntity::class,
+        AppEnjoymentEntity::class,
+        Notification::class
+    ]
+)
 
+@TypeConverters(
+    Survey.StatusTypeConverter::class,
+    DismissedCta.IdTypeConverter::class,
+    AppEnjoymentTypeConverter::class,
+    PromptCountConverter::class
+)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun trackerDataDao(): TrackerDataDao
@@ -56,6 +88,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun appConfigurationDao(): AppConfigurationDao
     abstract fun tabsDao(): TabsDao
     abstract fun bookmarksDao(): BookmarksDao
+    abstract fun networkEntityDao(): EntityListDao
+    abstract fun surveyDao(): SurveyDao
+    abstract fun dismissedCtaDao(): DismissedCtaDao
+    abstract fun searchCountDao(): SearchCountDao
+    abstract fun appsDaysUsedDao(): AppDaysUsedDao
+    abstract fun appEnjoymentDao(): AppEnjoymentDao
+    abstract fun notificationDao(): NotificationDao
 
     companion object {
         val MIGRATION_1_TO_2: Migration = object : Migration(1, 2) {
@@ -76,10 +115,75 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_3_TO_4: Migration = object : Migration(3, 4) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("DROP TABLE https_upgrade_domain")
+                database.execSQL("DROP TABLE `https_upgrade_domain`")
                 database.execSQL("CREATE TABLE `https_bloom_filter_spec` (`id` INTEGER NOT NULL, `errorRate` REAL NOT NULL, `totalEntries` INTEGER NOT NULL, `sha256` TEXT NOT NULL, PRIMARY KEY(`id`))")
                 database.execSQL("CREATE TABLE `https_whitelisted_domain` (`domain` TEXT NOT NULL, PRIMARY KEY(`domain`))")
             }
         }
+
+        val MIGRATION_4_TO_5: Migration = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `tabs` ADD COLUMN `viewed` INTEGER NOT NULL DEFAULT 1")
+                database.execSQL("ALTER TABLE `tabs` ADD COLUMN `position` INTEGER NOT NULL DEFAULT 0")
+
+                database.query("SELECT `tabId` from `tabs`").use {
+                    if (it.moveToFirst()) {
+                        var index = 0
+                        do {
+                            val tabId = it.getString(it.getColumnIndex("tabId"))
+                            database.execSQL("UPDATE `tabs` SET position=$index where `tabId` = \"$tabId\"")
+                            index += 1
+
+                        } while (it.moveToNext())
+                    }
+                }
+            }
+        }
+
+        val MIGRATION_5_TO_6: Migration = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `entity_list` (`entityName` TEXT NOT NULL, `domainName` TEXT NOT NULL, PRIMARY KEY(`domainName`))")
+            }
+        }
+
+        val MIGRATION_6_TO_7: Migration = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `survey` (`surveyId` TEXT NOT NULL, `url` TEXT, `daysInstalled` INTEGER, `status` TEXT NOT NULL, PRIMARY KEY(`surveyId`))")
+            }
+        }
+
+        val MIGRATION_7_TO_8: Migration = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `dismissed_cta` (`ctaId` TEXT NOT NULL, PRIMARY KEY(`ctaId`))")
+            }
+        }
+
+        val MIGRATION_8_TO_9: Migration = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `notification` (`notificationId` TEXT NOT NULL, PRIMARY KEY(`notificationId`))")
+            }
+        }
+
+        val MIGRATION_9_TO_10: Migration = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `search_count` (`key` TEXT NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`key`))")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `app_days_used` (`date` TEXT NOT NULL, PRIMARY KEY(`date`))")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `app_enjoyment` (`eventType` INTEGER NOT NULL, `promptCount` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `primaryKey` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)")
+            }
+
+        }
+
+        val ALL_MIGRATIONS: List<Migration>
+            get() = listOf(
+                MIGRATION_1_TO_2,
+                MIGRATION_2_TO_3,
+                MIGRATION_3_TO_4,
+                MIGRATION_4_TO_5,
+                MIGRATION_5_TO_6,
+                MIGRATION_6_TO_7,
+                MIGRATION_7_TO_8,
+                MIGRATION_8_TO_9,
+                MIGRATION_9_TO_10
+            )
     }
 }

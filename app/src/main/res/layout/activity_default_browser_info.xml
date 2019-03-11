@@ -1,4 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?><!--
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
   ~ Copyright (c) 2018 DuckDuckGo
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,14 +16,14 @@
   ~ limitations under the License.
   -->
 
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_margin="30dp"
     android:background="@drawable/notification_info_bottom_background"
-    tools:context="com.duckduckgo.app.browser.defaultBrowsing.DefaultBrowserInfoActivity">
+    tools:context="com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserInfoActivity">
 
     <View
         android:id="@+id/titleSection"
@@ -78,7 +80,7 @@
         app:layout_constraintTop_toBottomOf="@id/title" />
 
     <ImageView
-        android:id="@+id/dismissButton"
+        android:id="@+id/ctaDismissButton"
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:layout_marginStart="14dp"
@@ -114,7 +116,7 @@
         android:layout_marginStart="20dp"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="22dp"
-        android:background="@drawable/modal_card_button_bg"
+        android:background="@drawable/button_contained_bg"
         android:text="@string/onboardingDefaultBrowserGoToSettingsAction"
         android:textColor="@color/white"
         android:textSize="@dimen/modalCardMajorButtonTextSize"
@@ -123,4 +125,4 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-</android.support.constraint.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

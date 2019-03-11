@@ -16,27 +16,41 @@
 
 package com.duckduckgo.app.browser
 
+import android.annotation.TargetApi
 import android.graphics.Bitmap
 import android.net.Uri
-import android.support.annotation.WorkerThread
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.net.http.SslError
+import android.os.Build
+import androidx.annotation.AnyThread
+import androidx.annotation.UiThread
+import androidx.annotation.WorkerThread
+import android.webkit.*
 import androidx.core.net.toUri
-import com.duckduckgo.app.global.AppUrl
+import com.duckduckgo.app.global.isHttps
+import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
+import com.duckduckgo.app.statistics.pixels.Pixel
+import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.HTTPS_UPGRADE_SITE_ERROR
+import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.APP_VERSION
+import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.ERROR_CODE
+import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.URL
+import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.concurrent.thread
 
 
 class BrowserWebViewClient @Inject constructor(
-        private val requestRewriter: RequestRewriter,
-        private val specialUrlDetector: SpecialUrlDetector,
-        private val webViewRequestInterceptor: WebViewRequestInterceptor
+    private val requestRewriter: RequestRewriter,
+    private val specialUrlDetector: SpecialUrlDetector,
+    private val requestInterceptor: RequestInterceptor,
+    private val httpsUpgrader: HttpsUpgrader,
+    private val statisticsDataStore: StatisticsDataStore,
+    private val pixel: Pixel
 ) : WebViewClient() {
 
     var webViewClientListener: WebViewClientListener? = null
-    var currentUrl: String? = null
+
+    private var currentUrl: String? = null
 
     /**
      * This is the new method of url overriding available from API 24 onwards
@@ -59,6 +73,7 @@ class BrowserWebViewClient @Inject constructor(
      * API-agnostic implementation of deciding whether to override url or not
      */
     private fun shouldOverride(webView: WebView, url: Uri): Boolean {
+        Timber.v("shouldOverride $url")
 
         val urlType = specialUrlDetector.determineType(url)
 
@@ -80,13 +95,9 @@ class BrowserWebViewClient @Inject constructor(
                 if (requestRewriter.shouldRewriteRequest(url)) {
                     val newUri = requestRewriter.rewriteRequestWithCustomQueryParams(url)
                     webView.loadUrl(newUri.toString())
+                    return true
                 }
-                else{
-                    val tmpUri = replaceUriParameter(url, AppUrl.ParamKey.SAFE_SEARCH,
-                            AppUrl.ParamValue.SAFE_SEARCH_ON)
-                    webView.loadUrl(tmpUri.toString())
-                }
-                return true
+                return false
             }
         }
     }
@@ -96,52 +107,112 @@ class BrowserWebViewClient @Inject constructor(
     }
 
     override fun onPageStarted(webView: WebView, url: String?, favicon: Bitmap?) {
+        Timber.d("\nonPageStarted {\nurl: $url\nwebView.url: ${webView.url}\n}\n")
         currentUrl = url
-        webViewClientListener?.loadingStarted()
-        webViewClientListener?.urlChanged(url)
-    }
 
-    private fun replaceUriParameter(uri: Uri, key: String, newValue: String): Uri {
-        val params = uri.queryParameterNames
-        val newUri = uri.buildUpon().clearQuery()
-        var paramFound = false
-        for (param in params) {
-            newUri.appendQueryParameter(param,
-                    if (param == key) {
-                        paramFound = true
-                        newValue
-                    } else {
-                        uri.getQueryParameter(param)
-                    })
+        webViewClientListener?.let {
+            it.loadingStarted(url)
+            it.navigationOptionsChanged(determineNavigationOptions(webView))
         }
 
-        if(!paramFound){
-            newUri.appendQueryParameter(key, newValue)
+        val uri = if (currentUrl != null) Uri.parse(currentUrl) else null
+        if (uri != null) {
+            reportHttpsIfInUpgradeList(uri)
         }
-
-        return newUri.build()
     }
 
     override fun onPageFinished(webView: WebView, url: String?) {
-        val canGoBack = webView.canGoBack()
-        val canGoForward = webView.canGoForward()
+        Timber.d("onPageFinished $url")
 
-        webViewClientListener?.loadingFinished(url, canGoBack, canGoForward)
+        currentUrl = url
+        webViewClientListener?.let {
+            it.loadingFinished(url)
+            it.navigationOptionsChanged(determineNavigationOptions(webView))
+        }
     }
 
     @WorkerThread
     override fun shouldInterceptRequest(webView: WebView, request: WebResourceRequest): WebResourceResponse? {
         Timber.v("Intercepting resource ${request.url} on page $currentUrl")
-        return webViewRequestInterceptor.shouldIntercept(request, webView, currentUrl, webViewClientListener)
+        return requestInterceptor.shouldIntercept(request, webView, currentUrl, webViewClientListener)
+    }
+
+    @UiThread
+    @Suppress("OverridingDeprecatedMember")
+    override fun onReceivedError(view: WebView, errorCode: Int, description: String, failingUrl: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            val url = failingUrl.toUri()
+            reportHttpsErrorIfInUpgradeList(url, error = "WEB_RESOURCE_ERROR_$errorCode")
+        }
+        super.onReceivedError(view, errorCode, description, failingUrl)
+    }
+
+    @UiThread
+    @TargetApi(Build.VERSION_CODES.M)
+    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+        if (request.isForMainFrame) {
+            reportHttpsErrorIfInUpgradeList(request.url, error = "WEB_RESOURCE_ERROR_${error.errorCode}")
+        }
+        super.onReceivedError(view, request, error)
+    }
+
+    @UiThread
+    override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+        val uri = error.url.toUri()
+        val isMainFrameRequest = currentUrl == uri.toString()
+        if (isMainFrameRequest) {
+            reportHttpsErrorIfInUpgradeList(uri, "SSL_ERROR_${error.primaryError}")
+        }
+        super.onReceivedSslError(view, handler, error)
+    }
+
+    @AnyThread
+    private fun reportHttpsErrorIfInUpgradeList(url: Uri, error: String?) {
+        if (!url.isHttps) return
+        thread {
+            if (httpsUpgrader.isInUpgradeList(url)) {
+                reportHttpsUpgradeSiteError(url, error)
+                statisticsDataStore.httpsUpgradesFailures += 1
+            }
+        }
+    }
+
+    @AnyThread
+    private fun reportHttpsIfInUpgradeList(url: Uri) {
+        if (!url.isHttps) return
+        thread {
+            if (httpsUpgrader.isInUpgradeList(url)) {
+                statisticsDataStore.httpsUpgradesTotal += 1
+            }
+        }
+    }
+
+    private fun reportHttpsUpgradeSiteError(url: Uri, error: String?) {
+        val host = url.host ?: return
+        val params = mapOf(
+            APP_VERSION to BuildConfig.VERSION_NAME,
+            URL to "https://$host",
+            ERROR_CODE to error
+        )
+        pixel.fire(HTTPS_UPGRADE_SITE_ERROR, params)
     }
 
     /**
      * Utility to function to execute a function, and then return true
      *
      * Useful to reduce clutter in repeatedly including `return true` after doing the real work.
-     */ 
+     */
     private inline fun consume(function: () -> Unit): Boolean {
         function()
         return true
     }
+
+    private fun determineNavigationOptions(webView: WebView): BrowserNavigationOptions {
+        val canGoBack = webView.canGoBack()
+        val canGoForward = webView.canGoForward()
+        return BrowserNavigationOptions(canGoBack, canGoForward)
+    }
+
+    data class BrowserNavigationOptions(val canGoBack: Boolean, val canGoForward: Boolean)
+
 }

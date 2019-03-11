@@ -16,21 +16,23 @@
 
 package com.duckduckgo.app.privacy.ui
 
-import android.arch.core.executor.testing.InstantTaskExecutorRule
-import android.arch.lifecycle.LiveData
-import android.arch.lifecycle.Observer
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Observer
 import com.duckduckgo.app.global.model.Site
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao
 import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao.NetworkTally
 import com.duckduckgo.app.privacy.model.HttpsStatus
 import com.duckduckgo.app.privacy.model.PrivacyGrade
-import com.duckduckgo.app.privacy.model.TermsOfService
+import com.duckduckgo.app.privacy.model.PrivacyPractices
+import com.duckduckgo.app.privacy.model.PrivacyPractices.Summary.GOOD
+import com.duckduckgo.app.privacy.model.PrivacyPractices.Summary.UNKNOWN
 import com.duckduckgo.app.privacy.store.PrivacySettingsStore
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.*
-import com.nhaarman.mockito_kotlin.mock
-import com.nhaarman.mockito_kotlin.verify
-import com.nhaarman.mockito_kotlin.whenever
+import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.PRIVACY_DASHBOARD_OPENED
+import com.nhaarman.mockitokotlin2.mock
+import com.nhaarman.mockitokotlin2.verify
+import com.nhaarman.mockitokotlin2.whenever
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -83,9 +85,8 @@ class PrivacyDashboardViewModelTest {
         assertEquals(PrivacyGrade.UNKNOWN, viewState.beforeGrade)
         assertEquals(PrivacyGrade.UNKNOWN, viewState.afterGrade)
         assertEquals(HttpsStatus.SECURE, viewState.httpsStatus)
-        assertEquals(0, viewState.networkCount)
         assertTrue(viewState.allTrackersBlocked)
-        assertEquals(TermsOfService.Practices.UNKNOWN, testee.viewState.value!!.practices)
+        assertEquals(UNKNOWN, testee.viewState.value!!.practices)
     }
 
     @Test
@@ -117,8 +118,8 @@ class PrivacyDashboardViewModelTest {
     }
 
     @Test
-    fun whenSiteHasTrackersThenViewModelGradesAreUpdated() {
-        val site = site(allTrackersBlocked = true, trackerCount = 1000)
+    fun whenSiteGradesAreUpdatedThenViewModelGradesAreUpdated() {
+        val site = site(grade = PrivacyGrade.D, improvedGrade = PrivacyGrade.B)
         testee.onSiteChanged(site)
         assertEquals(PrivacyGrade.D, testee.viewState.value?.beforeGrade)
         assertEquals(PrivacyGrade.B, testee.viewState.value?.afterGrade)
@@ -128,12 +129,6 @@ class PrivacyDashboardViewModelTest {
     fun whenSiteHttpsStatusIsUpdatedThenViewModelIsUpdated() {
         testee.onSiteChanged(site(https = HttpsStatus.MIXED))
         assertEquals(HttpsStatus.MIXED, testee.viewState.value?.httpsStatus)
-    }
-
-    @Test
-    fun whenNetworkCountIsUpdatedThenCountIsUpdatedInViewModel() {
-        testee.onSiteChanged(site(networkCount = 10))
-        assertEquals(10, testee.viewState.value!!.networkCount)
     }
 
     @Test
@@ -149,10 +144,10 @@ class PrivacyDashboardViewModelTest {
     }
 
     @Test
-    fun whenTermsAreUpdatedThenPracticesAreUpdatedInViewModel() {
-        val terms = TermsOfService(classification = "A", goodPrivacyTerms = listOf("good"))
-        testee.onSiteChanged(site(terms = terms))
-        assertEquals(TermsOfService.Practices.GOOD, testee.viewState.value!!.practices)
+    fun whenPrivacyPracticesAreUpdatedThenPracticesAreUpdatedInViewModel() {
+        val practices = PrivacyPractices.Practices(0, GOOD, emptyList(), emptyList())
+        testee.onSiteChanged(site(privacyPractices = practices))
+        assertEquals(GOOD, testee.viewState.value!!.practices)
     }
 
     @Test
@@ -206,18 +201,18 @@ class PrivacyDashboardViewModelTest {
     private fun site(
         https: HttpsStatus = HttpsStatus.SECURE,
         trackerCount: Int = 0,
-        networkCount: Int = 0,
-        hasTrackerFromMajorNetwork: Boolean = false,
         allTrackersBlocked: Boolean = true,
-        terms: TermsOfService = TermsOfService()
+        privacyPractices: PrivacyPractices.Practices = PrivacyPractices.UNKNOWN,
+        grade: PrivacyGrade = PrivacyGrade.UNKNOWN,
+        improvedGrade: PrivacyGrade = PrivacyGrade.UNKNOWN
     ): Site {
         val site: Site = mock()
         whenever(site.https).thenReturn(https)
         whenever(site.trackerCount).thenReturn(trackerCount)
-        whenever(site.networkCount).thenReturn(networkCount)
-        whenever(site.hasTrackerFromMajorNetwork).thenReturn(hasTrackerFromMajorNetwork)
         whenever(site.allTrackersBlocked).thenReturn(allTrackersBlocked)
-        whenever(site.termsOfService).thenReturn(terms)
+        whenever(site.privacyPractices).thenReturn(privacyPractices)
+        whenever(site.grade).thenReturn(grade)
+        whenever(site.improvedGrade).thenReturn(improvedGrade)
         return site
     }
 
