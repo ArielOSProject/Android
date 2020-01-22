@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
+@file:Suppress("SameParameterValue")
+
 package com.duckduckgo.app.statistics
 
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
-import com.duckduckgo.app.widget.ui.WidgetCapabilities
 import com.nhaarman.mockitokotlin2.*
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
@@ -29,7 +29,6 @@ class ExperimentationVariantManagerTest {
     private lateinit var testee: ExperimentationVariantManager
 
     private val mockStore: StatisticsDataStore = mock()
-    private val mockWidgetCapabilities: WidgetCapabilities = mock()
     private val mockRandomizer: IndexRandomizer = mock()
     private val activeVariants = mutableListOf<Variant>()
 
@@ -43,7 +42,7 @@ class ExperimentationVariantManagerTest {
 
     @Test
     fun whenVariantAlreadyPersistedThenVariantReturned() {
-        activeVariants.add(Variant("foo", 100.0))
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
         whenever(mockStore.variant).thenReturn("foo")
 
         assertEquals("foo", testee.getVariant(activeVariants).key)
@@ -51,7 +50,7 @@ class ExperimentationVariantManagerTest {
 
     @Test
     fun whenVariantAlreadyPersistedThenVariantAllocatorNeverInvoked() {
-        activeVariants.add(Variant("foo", 100.0))
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
         whenever(mockStore.variant).thenReturn("foo")
 
         testee.getVariant(activeVariants)
@@ -77,7 +76,7 @@ class ExperimentationVariantManagerTest {
 
     @Test
     fun whenVariantPersistedIsNotFoundInActiveVariantListThenRestoredToDefaultVariant() {
-        activeVariants.add(Variant("foo", 100.0))
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
         whenever(mockStore.variant).thenReturn("bar")
 
         assertEquals(VariantManager.DEFAULT_VARIANT, testee.getVariant(activeVariants))
@@ -85,7 +84,7 @@ class ExperimentationVariantManagerTest {
 
     @Test
     fun whenVariantPersistedIsNotFoundInActiveVariantListThenNewVariantIsPersisted() {
-        activeVariants.add(Variant("foo", 100.0))
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
 
         whenever(mockStore.variant).thenReturn("bar")
         testee.getVariant(activeVariants)
@@ -93,10 +92,9 @@ class ExperimentationVariantManagerTest {
         verify(mockStore).variant = VariantManager.DEFAULT_VARIANT.key
     }
 
-
     @Test
     fun whenNoVariantPersistedThenNewVariantAllocated() {
-        activeVariants.add(Variant("foo", 100.0))
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
 
         testee.getVariant(activeVariants)
 
@@ -105,10 +103,78 @@ class ExperimentationVariantManagerTest {
 
     @Test
     fun whenNoVariantPersistedThenNewVariantKeyIsAllocatedAndPersisted() {
-        activeVariants.add(Variant("foo", 100.0))
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
 
         testee.getVariant(activeVariants)
 
         verify(mockStore).variant = "foo"
+    }
+
+    @Test
+    fun whenVariantDoesNotComplyWithFiltersThenDefaultVariantIsPersisted() {
+        activeVariants.add(Variant("foo", 100.0, filterBy = { false }))
+
+        testee.getVariant(activeVariants)
+
+        verify(mockStore).variant = VariantManager.DEFAULT_VARIANT.key
+    }
+
+    @Test
+    fun whenVariantDoesComplyWithFiltersThenNewVariantKeyIsAllocatedAndPersisted() {
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
+
+        testee.getVariant(activeVariants)
+
+        verify(mockStore).variant = "foo"
+    }
+
+    @Test
+    fun whenReferrerVariantSetWithNoActiveVariantsThenReferrerVariantReturned() {
+        val referrerVariantKey = "xx"
+        mockUpdateScenario(referrerVariantKey)
+
+        val variant = testee.getVariant(emptyList())
+        assertEquals(referrerVariantKey, variant.key)
+    }
+
+    @Test
+    fun whenReferrerVariantSetWithActiveVariantsThenReferrerVariantReturned() {
+        val referrerVariantKey = "xx"
+        mockUpdateScenario(referrerVariantKey)
+
+        activeVariants.add(Variant("foo", 100.0, filterBy = { true }))
+        activeVariants.add(Variant("bar", 100.0, filterBy = { true }))
+        val variant = testee.getVariant(activeVariants)
+
+        assertEquals(referrerVariantKey, variant.key)
+    }
+
+    @Test
+    fun whenUpdatingReferrerVariantThenDataStoreHasItsDataUpdated() {
+        testee.updateAppReferrerVariant("xx")
+        verify(mockStore).referrerVariant = "xx"
+        verify(mockStore).variant = "xx"
+    }
+
+    @Test
+    fun whenUpdatingReferrerVariantThenNewReferrerVariantReturned() {
+        val originalVariant = testee.getVariant(activeVariants)
+        mockUpdateScenario("xx")
+        val newVariant = testee.getVariant(activeVariants)
+        assertNotEquals(originalVariant, newVariant)
+        assertEquals("xx", newVariant.key)
+    }
+
+    @Test
+    fun whenReferrerVariantReturnedThenNoFeaturesEnabled() {
+        mockUpdateScenario("xx")
+        val variant = testee.getVariant(activeVariants)
+        assertTrue(variant.features.isEmpty())
+    }
+
+    private fun mockUpdateScenario(key: String) {
+        testee.updateAppReferrerVariant(key)
+        whenever(mockStore.referrerVariant).thenReturn(key)
+        whenever(mockStore.variant).thenReturn(key)
     }
 }

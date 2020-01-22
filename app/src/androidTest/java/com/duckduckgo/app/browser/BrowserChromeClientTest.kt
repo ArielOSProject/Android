@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
+@file:Suppress("RemoveExplicitTypeArguments")
+
 package com.duckduckgo.app.browser
 
 import android.content.Context
+import android.os.Message
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import androidx.test.annotation.UiThreadTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
-import com.nhaarman.mockitokotlin2.any
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.times
-import com.nhaarman.mockitokotlin2.verify
+import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
+import com.nhaarman.mockitokotlin2.*
 import org.junit.Before
 import org.junit.Test
 
@@ -34,12 +35,14 @@ class BrowserChromeClientTest {
     private lateinit var testee: BrowserChromeClient
     private lateinit var webView: TestWebView
     private lateinit var mockWebViewClientListener: WebViewClientListener
+    private lateinit var mockUncaughtExceptionRepository: UncaughtExceptionRepository
     private val fakeView = View(getInstrumentation().targetContext)
 
     @UiThreadTest
     @Before
     fun setup() {
-        testee = BrowserChromeClient()
+        mockUncaughtExceptionRepository = mock()
+        testee = BrowserChromeClient(mockUncaughtExceptionRepository)
         mockWebViewClientListener = mock()
         testee.webViewClientListener = mockWebViewClientListener
         webView = TestWebView(getInstrumentation().targetContext)
@@ -78,43 +81,35 @@ class BrowserChromeClientTest {
     @Test
     fun whenOnProgressChangedCalledThenListenerInstructedToUpdateProgress() {
         testee.onProgressChanged(webView, 10)
-        verify(mockWebViewClientListener).progressChanged(webView.stubUrl, 10)
+        verify(mockWebViewClientListener).progressChanged(10)
     }
 
     @UiThreadTest
     @Test
-    fun whenOnProgressChangedCalledButNoUrlChangeThenListenerInstructedToUpdateProgressASecondTime() {
-        webView.stubUrl = "foo.com"
+    fun whenOnProgressChangedCalledThenListenerInstructedToUpdateNavigationState() {
         testee.onProgressChanged(webView, 10)
-        testee.onProgressChanged(webView, 20)
-        verify(mockWebViewClientListener, times(2)).progressChanged(any(), any())
+        verify(mockWebViewClientListener).navigationStateChanged(any())
     }
 
     @UiThreadTest
     @Test
-    fun whenOnProgressChangedCalledAfterUrlChangeThenListenerInstructedToUpdateProgressAgain() {
-        webView.stubUrl = "foo.com"
-        testee.onProgressChanged(webView, 10)
-        testee.onProgressChanged(webView, 20)
-        webView.stubUrl = "bar.com"
-        testee.onProgressChanged(webView, 30)
-        verify(mockWebViewClientListener, times(3)).progressChanged(any(), any())
+    fun whenOnCreateWindowWithUserGestureThenMessageOpenedInNewTab() {
+        testee.onCreateWindow(webView, isDialog = false, isUserGesture = true, resultMsg = mockMsg)
+        verify(mockWebViewClientListener).openMessageInNewTab(eq(mockMsg))
+        verifyNoMoreInteractions(mockWebViewClientListener)
     }
 
     @UiThreadTest
     @Test
-    fun whenOnProgressChangedCalledThenPassedOnToWebClient() {
-        val url = "https://example.com"
-        webView.stubUrl = url
-        testee.onProgressChanged(webView, 10)
-        verify(mockWebViewClientListener).progressChanged(url, 10)
+    fun whenOnCreateWindowWithoutUserGestureThenNewTabNotOpened() {
+        testee.onCreateWindow(webView, isDialog = false, isUserGesture = false, resultMsg = mockMsg)
+        verifyZeroInteractions(mockWebViewClientListener)
     }
 
-    private class TestWebView(context: Context) : WebView(context) {
-        var stubUrl: String = ""
-
-        override fun getUrl(): String {
-            return stubUrl
-        }
+    private val mockMsg = Message().apply {
+        target = mock()
+        obj = mock<WebView.WebViewTransport>()
     }
+
+    private class TestWebView(context: Context) : WebView(context)
 }

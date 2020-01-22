@@ -24,5 +24,5 @@ import androidx.room.PrimaryKey
 )
 data class Notification(
     @PrimaryKey
-    var notificationId: String
+    val notificationId: String
 )

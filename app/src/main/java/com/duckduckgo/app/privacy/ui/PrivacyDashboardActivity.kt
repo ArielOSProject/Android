@@ -17,12 +17,12 @@
 package com.duckduckgo.app.privacy.ui
 
 import android.app.Activity
-import androidx.lifecycle.Observer
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.core.content.ContextCompat
 import android.view.View
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Observer
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.DuckDuckGoActivity
 import com.duckduckgo.app.global.model.Site
@@ -99,14 +99,14 @@ class PrivacyDashboardActivity : DuckDuckGoActivity() {
 
     private fun renderTrackerNetworkLeaderboard(viewState: ViewState) {
 
-        if (!viewState.showTrackerNetworkLeaderboard) {
+        if (!viewState.shouldShowTrackerNetworkLeaderboard) {
             hideTrackerNetworkLeaderboard()
             return
         }
 
-        trackerNetworkPill1.render(viewState.trackerNetworkTally.elementAtOrNull(0), viewState.domainsVisited)
-        trackerNetworkPill2.render(viewState.trackerNetworkTally.elementAtOrNull(1), viewState.domainsVisited)
-        trackerNetworkPill3.render(viewState.trackerNetworkTally.elementAtOrNull(2), viewState.domainsVisited)
+        trackerNetworkPill1.render(viewState.trackerNetworkEntries.elementAtOrNull(0), viewState.sitesVisited)
+        trackerNetworkPill2.render(viewState.trackerNetworkEntries.elementAtOrNull(1), viewState.sitesVisited)
+        trackerNetworkPill3.render(viewState.trackerNetworkEntries.elementAtOrNull(2), viewState.sitesVisited)
         showTrackerNetworkLeaderboard()
     }
 
@@ -132,7 +132,7 @@ class PrivacyDashboardActivity : DuckDuckGoActivity() {
         privacyToggle.isChecked = enabled
     }
 
-    fun onScorecardClicked() {
+    private fun onScorecardClicked() {
         pixel.fire(PRIVACY_DASHBOARD_SCORECARD)
         startActivity(ScorecardActivity.intent(this, intent.tabId!!))
     }

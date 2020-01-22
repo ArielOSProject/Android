@@ -29,6 +29,7 @@
     <ImageView
         android:id="@+id/ddgLogo"
         android:layout_width="0dp"
+        android:alpha="0"
         android:layout_height="wrap_content"
         android:contentDescription="@string/duckDuckGoLogoDescription"
         android:src="@drawable/logo_full"
@@ -39,6 +40,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintWidth_max="180dp" />
+
+    <include
+        layout="@layout/include_dax_dialog_cta"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="40dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <LinearLayout
         android:id="@+id/ctaContainer"

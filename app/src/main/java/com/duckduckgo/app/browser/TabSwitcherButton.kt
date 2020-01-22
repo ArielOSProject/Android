@@ -44,6 +44,10 @@ class TabSwitcherButton(context: Context) : FrameLayout(context) {
         clickZone.setOnClickListener {
             super.callOnClick()
         }
+
+        clickZone.setOnLongClickListener {
+            super.performLongClick()
+        }
     }
 
     fun increment(callback: () -> Unit) {
@@ -57,6 +61,16 @@ class TabSwitcherButton(context: Context) : FrameLayout(context) {
 
         fadeOutCount {
             count += 1
+            fadeInCount()
+        }
+
+        anim.playAnimation()
+    }
+
+    fun animateCount() {
+        anim.progress = 0.0f
+
+        fadeOutCount {
             fadeInCount()
         }
 

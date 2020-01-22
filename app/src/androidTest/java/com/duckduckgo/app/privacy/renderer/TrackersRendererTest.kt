@@ -18,7 +18,7 @@ package com.duckduckgo.app.privacy.renderer
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao.NetworkTally
+import com.duckduckgo.app.privacy.db.NetworkLeaderboardEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -65,26 +65,26 @@ class TrackersRendererTest {
     }
 
     @Test
-    fun whenTotalDomainsIsZeroThenPercentageIsBlank() {
-        val text = testee.networkPercentage(NetworkTally("", 10), 0)
+    fun whenSitesVisitedIsZeroThenPercentageIsBlank() {
+        val text = testee.networkPercentage(NetworkLeaderboardEntry("", 10), 0)
         assertEquals("", text)
     }
 
     @Test
-    fun whenDomainCountIsZeroThenPercentageIsBlank() {
-        val text = testee.networkPercentage(NetworkTally("", 0), 10)
+    fun whenNetworkCountIsZeroThenPercentageIsBlank() {
+        val text = testee.networkPercentage(NetworkLeaderboardEntry("", 0), 10)
         assertEquals("", text)
     }
 
     @Test
     fun whenPortionIsRecurringFractionThenPercentageIsRoundNumber() {
-        val text = testee.networkPercentage(NetworkTally("", 10), 30)
+        val text = testee.networkPercentage(NetworkLeaderboardEntry("", 10), 30)
         assertEquals("33%", text)
     }
 
     @Test
     fun whenPortionIsHalfThenPercentageIs50Percent() {
-        val text = testee.networkPercentage(NetworkTally("", 10), 20)
+        val text = testee.networkPercentage(NetworkLeaderboardEntry("", 10), 20)
         assertEquals("50%", text)
     }
 
@@ -114,26 +114,26 @@ class TrackersRendererTest {
 
     @Test
     fun whenNetworkNameMatchesPillIconThenResourceIsReturned() {
-        val resource = testee.networkPillIcon(context, "facebook")
-        assertEquals(R.drawable.network_pill_facebook, resource)
+        val resource = testee.networkPillIcon(context, "outbrain")
+        assertEquals(R.drawable.network_pill_outbrain, resource)
     }
 
     @Test
     fun whenNetworkNameMatchesLogoIconThenResourceIsReturned() {
-        val resource = testee.networkLogoIcon(context, "facebook")
-        assertEquals(R.drawable.network_logo_facebook, resource)
+        val resource = testee.networkLogoIcon(context, "outbrain")
+        assertEquals(R.drawable.network_logo_outbrain, resource)
     }
 
     @Test
-    fun whenNetworkNameSansDotsMatchesLogoIconThenResourceIsReturned() {
-        val resource = testee.networkLogoIcon(context, "amazon.com")
-        assertEquals(R.drawable.network_logo_amazoncom, resource)
+    fun whenNetworkNameSansSpecialCharactersAndWithUnderscoresForSpacesMatchesLogoIconThenResourceIsReturned() {
+        val resource = testee.networkLogoIcon(context, "Amazon Technologies, Inc.")
+        assertEquals(R.drawable.network_logo_amazon_technologies_inc, resource)
     }
 
     @Test
-    fun whenNetworkNameSansSpacesMatchesPillIconThenResourceIsReturned() {
-        val resource = testee.networkLogoIcon(context, "fox one stop media")
-        assertEquals(R.drawable.network_logo_foxonestopmedia, resource)
+    fun whenNetworkNameSansSpecialCharactersAndWithUnderscoresForSpacesMatchesPillIconWithUnderscoresThenResourceIsReturned() {
+        val resource = testee.networkPillIcon(context, "Amazon Technologies, Inc.")
+        assertEquals(R.drawable.network_pill_amazon_technologies_inc, resource)
     }
 
     @Test

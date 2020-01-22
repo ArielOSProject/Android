@@ -25,37 +25,45 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.work.Configuration
-import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import com.duckduckgo.app.browser.BuildConfig
+import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserObserver
 import com.duckduckgo.app.di.AppComponent
 import com.duckduckgo.app.di.DaggerAppComponent
 import com.duckduckgo.app.fire.DataClearer
 import com.duckduckgo.app.fire.FireActivity
 import com.duckduckgo.app.fire.UnsentForgetAllPixelStore
 import com.duckduckgo.app.global.Theming.initializeTheme
+import com.duckduckgo.app.global.initialization.AppDataLoader
 import com.duckduckgo.app.global.install.AppInstallStore
 import com.duckduckgo.app.global.rating.AppEnjoymentLifecycleObserver
 import com.duckduckgo.app.global.shortcut.AppShortcutCreator
 import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
 import com.duckduckgo.app.job.AppConfigurationSyncer
-import com.duckduckgo.app.notification.NotificationScheduler
 import com.duckduckgo.app.notification.NotificationRegistrar
+import com.duckduckgo.app.notification.NotificationScheduler
+import com.duckduckgo.app.referral.AppInstallationReferrerStateListener
 import com.duckduckgo.app.settings.db.SettingsDataStore
+import com.duckduckgo.app.statistics.AtbInitializer
+import com.duckduckgo.app.statistics.VariantManager
+import com.duckduckgo.app.statistics.api.OfflinePixelScheduler
+import com.duckduckgo.app.statistics.api.OfflinePixelSender
 import com.duckduckgo.app.statistics.api.StatisticsUpdater
 import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.statistics.pixels.Pixel.PixelName.APP_LAUNCH
+import com.duckduckgo.app.statistics.store.OfflinePixelCountDataStore
+import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import com.duckduckgo.app.surrogates.ResourceSurrogateLoader
 import com.duckduckgo.app.trackerdetection.TrackerDataLoader
 import com.duckduckgo.app.usage.app.AppDaysUsedRecorder
-import com.squareup.leakcanary.LeakCanary
 import dagger.android.AndroidInjector
 import dagger.android.DispatchingAndroidInjector
 import dagger.android.HasActivityInjector
 import dagger.android.HasServiceInjector
 import dagger.android.support.HasSupportFragmentInjector
 import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.jetbrains.anko.doAsync
 import timber.log.Timber
 import javax.inject.Inject
@@ -82,7 +90,13 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
     lateinit var appConfigurationSyncer: AppConfigurationSyncer
 
     @Inject
+    lateinit var defaultBrowserObserver: DefaultBrowserObserver
+
+    @Inject
     lateinit var statisticsUpdater: StatisticsUpdater
+
+    @Inject
+    lateinit var statisticsDataStore: StatisticsDataStore
 
     @Inject
     lateinit var appInstallStore: AppInstallStore
@@ -106,6 +120,12 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
     lateinit var unsentForgetAllPixelStore: UnsentForgetAllPixelStore
 
     @Inject
+    lateinit var offlinePixelScheduler: OfflinePixelScheduler
+
+    @Inject
+    lateinit var offlinePixelCountDataStore: OfflinePixelCountDataStore
+
+    @Inject
     lateinit var dataClearer: DataClearer
 
     @Inject
@@ -120,6 +140,24 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
     @Inject
     lateinit var appDaysUsedRecorder: AppDaysUsedRecorder
 
+    @Inject
+    lateinit var appDataLoader: AppDataLoader
+
+    @Inject
+    lateinit var offlinePixelSender: OfflinePixelSender
+
+    @Inject
+    lateinit var alertingUncaughtExceptionHandler: AlertingUncaughtExceptionHandler
+
+    @Inject
+    lateinit var referralStateListener: AppInstallationReferrerStateListener
+
+    @Inject
+    lateinit var atbInitializer: AtbInitializer
+
+    @Inject
+    lateinit var variantManager: VariantManager
+
     private var launchedByFireAction: Boolean = false
 
     open lateinit var daggerAppComponent: AppComponent
@@ -127,21 +165,19 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
     override fun onCreate() {
         super.onCreate()
 
-        if (!installLeakCanary()) return
-
         configureLogging()
         configureDependencyInjection()
+        configureUncaughtExceptionHandler()
 
         Timber.i("Creating DuckDuckGoApplication")
 
         if (appIsRestarting()) return
 
-        configureWorkManager()
-
         ProcessLifecycleOwner.get().lifecycle.also {
             it.addObserver(this)
             it.addObserver(dataClearer)
             it.addObserver(appDaysUsedRecorder)
+            it.addObserver(defaultBrowserObserver)
             it.addObserver(appEnjoymentLifecycleObserver)
         }
 
@@ -150,37 +186,30 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
         }
 
         recordInstallationTimestamp()
-        initializeStatistics()
-        initializeTheme(settingsDataStore)
+        initializeTheme(settingsDataStore, variantManager)
         loadTrackerData()
         configureDataDownloader()
+        scheduleOfflinePixels()
 
         notificationRegistrar.registerApp()
 
         initializeHttpsUpgrader()
         submitUnsentFirePixels()
+
+        GlobalScope.launch {
+            referralStateListener.initialiseReferralRetrieval()
+            appDataLoader.loadData()
+        }
     }
 
-    private fun configureWorkManager() {
-        val config = Configuration.Builder()
-            .setWorkerFactory(workerFactory)
-            .build()
-
-        WorkManager.initialize(this, config)
+    private fun configureUncaughtExceptionHandler() {
+        Thread.setDefaultUncaughtExceptionHandler(alertingUncaughtExceptionHandler)
     }
 
     private fun recordInstallationTimestamp() {
         if (!appInstallStore.hasInstallTimestampRecorded()) {
             appInstallStore.installTimestamp = System.currentTimeMillis()
         }
-    }
-
-    protected open fun installLeakCanary(): Boolean {
-        if (LeakCanary.isInAnalyzerProcess(this)) {
-            return false
-        }
-        LeakCanary.install(this)
-        return true
     }
 
     private fun appIsRestarting(): Boolean {
@@ -207,10 +236,6 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
             .application(this)
             .build()
         daggerAppComponent.inject(this)
-    }
-
-    private fun initializeStatistics() {
-        statisticsUpdater.initializeAtb()
     }
 
     private fun initializeHttpsUpgrader() {
@@ -248,6 +273,10 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
             .subscribe({}, { Timber.w("Failed to download initial app configuration ${it.localizedMessage}") })
     }
 
+    private fun scheduleOfflinePixels() {
+        offlinePixelScheduler.scheduleOfflinePixels()
+    }
+
     override fun activityInjector(): AndroidInjector<Activity> = activityInjector
 
     override fun supportFragmentInjector(): AndroidInjector<Fragment> = supportFragmentInjector
@@ -267,7 +296,11 @@ open class DuckDuckGoApplication : HasActivityInjector, HasServiceInjector, HasS
     @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
     fun onAppResumed() {
         notificationRegistrar.updateStatus()
-        notificationScheduler.scheduleNextNotification()
+        GlobalScope.launch {
+            notificationScheduler.scheduleNextNotification()
+
+            atbInitializer.initializeAfterReferrerAvailable()
+        }
     }
 
     companion object {

@@ -16,25 +16,27 @@
 
 package com.duckduckgo.app.browser
 
-import androidx.annotation.WorkerThread
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.annotation.WorkerThread
 import com.duckduckgo.app.global.isHttp
 import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
+import com.duckduckgo.app.privacy.db.PrivacyProtectionCountDao
 import com.duckduckgo.app.privacy.model.TrustedSites
 import com.duckduckgo.app.surrogates.ResourceSurrogates
 import com.duckduckgo.app.trackerdetection.TrackerDetector
-import com.duckduckgo.app.trackerdetection.model.ResourceType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 interface RequestInterceptor {
 
     @WorkerThread
-    fun shouldIntercept(
+    suspend fun shouldIntercept(
         request: WebResourceRequest,
         webView: WebView,
-        currentUrl: String?,
+        documentUrl: String?,
         webViewClientListener: WebViewClientListener?
     ): WebResourceResponse?
 }
@@ -42,7 +44,9 @@ interface RequestInterceptor {
 class WebViewRequestInterceptor(
     private val resourceSurrogates: ResourceSurrogates,
     private val trackerDetector: TrackerDetector,
-    private val httpsUpgrader: HttpsUpgrader
+    private val httpsUpgrader: HttpsUpgrader,
+    private val privacyProtectionCountDao: PrivacyProtectionCountDao
+
 ) : RequestInterceptor {
 
     /**
@@ -55,21 +59,27 @@ class WebViewRequestInterceptor(
      * caution when accessing private data or the view system.
      */
     @WorkerThread
-    override fun shouldIntercept(
+    override suspend fun shouldIntercept(
         request: WebResourceRequest,
         webView: WebView,
-        currentUrl: String?,
+        documentUrl: String?,
         webViewClientListener: WebViewClientListener?
     ): WebResourceResponse? {
+
         val url = request.url
 
         if (shouldUpgrade(request)) {
             val newUri = httpsUpgrader.upgrade(url)
-            webView.post { webView.loadUrl(newUri.toString()) }
+
+            withContext(Dispatchers.Main) {
+                webView.loadUrl(newUri.toString())
+            }
+
+            privacyProtectionCountDao.incrementUpgradeCount()
             return WebResourceResponse(null, null, null)
         }
 
-        val documentUrl = currentUrl ?: return null
+        if (documentUrl == null) return null
 
         if (TrustedSites.isTrusted(documentUrl)) {
             return null
@@ -80,7 +90,6 @@ class WebViewRequestInterceptor(
         }
 
         if (shouldBlock(request, documentUrl, webViewClientListener)) {
-
             val surrogate = resourceSurrogates.get(url)
             if (surrogate.responseAvailable) {
                 Timber.d("Surrogate found for $url")
@@ -88,6 +97,7 @@ class WebViewRequestInterceptor(
             }
 
             Timber.d("Blocking request $url")
+            privacyProtectionCountDao.incrementBlockedTrackerCount()
             return WebResourceResponse(null, null, null)
         }
 
@@ -104,7 +114,7 @@ class WebViewRequestInterceptor(
             return false
         }
 
-        val trackingEvent = trackerDetector.evaluate(url, documentUrl, ResourceType.from(request)) ?: return false
+        val trackingEvent = trackerDetector.evaluate(url, documentUrl) ?: return false
         webViewClientListener?.trackerDetected(trackingEvent)
         return trackingEvent.blocked
     }

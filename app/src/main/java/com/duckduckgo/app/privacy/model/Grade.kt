@@ -17,9 +17,16 @@
 package com.duckduckgo.app.privacy.model
 
 import com.duckduckgo.app.privacy.model.Grade.Grading.*
+import com.duckduckgo.app.privacy.model.Grade.Scores.ScoresAvailable
+import com.duckduckgo.app.privacy.model.Grade.Scores.ScoresUnavailable
+import com.duckduckgo.app.trackerdetection.model.Entity
 import com.squareup.moshi.Json
+import timber.log.Timber
 
-class Grade {
+class Grade(
+    val https: Boolean = false,
+    val httpsAutoUpgrade: Boolean = false
+) {
 
     enum class Grading {
 
@@ -32,10 +39,9 @@ class Grade {
         C,
         D,
         @Json(name = "D-")
-        D_MINUS
-
+        D_MINUS,
+        UNKNOWN
     }
-
 
     data class Score(
         val grade: Grading,
@@ -45,21 +51,37 @@ class Grade {
         val privacyScore: Int
     )
 
-    data class Scores(
-        val site: Score,
-        val enhanced: Score
-    )
+    sealed class Scores {
 
-    var https: Boolean = false
-    var httpsAutoUpgrade: Boolean = false
-    var privacyScore: Int? = null
+        data class ScoresAvailable(
+            val site: Score,
+            val enhanced: Score
+        ) : Scores()
 
-    val scores: Grade.Scores get() = calculate()
+        object ScoresUnavailable : Scores()
+    }
 
-    private var entitiesNotBlocked: MutableMap<String, Double> = mutableMapOf()
-    private var entitiesBlocked: MutableMap<String, Double> = mutableMapOf()
+    private var privacyScore: Int? = null
 
-    private fun calculate(): Grade.Scores {
+    private var fullSiteDetailsAvailable: Boolean = false
+    private var entitiesNotBlocked: Map<String, Double> = mapOf()
+    private var entitiesBlocked: Map<String, Double> = mapOf()
+
+    fun updateData(privacyScore: Int?, parentEntity: Entity?) {
+        this.privacyScore = privacyScore
+        parentEntity?.let {
+            setParentEntity(parentEntity)
+        }
+
+        fullSiteDetailsAvailable = true
+    }
+
+    fun calculateScore(): Scores {
+
+        if (!fullSiteDetailsAvailable) {
+            Timber.d("Full site details are not available")
+            return scoresUnavailable()
+        }
 
         // HTTPS
         val siteHttpsScore: Int
@@ -111,8 +133,10 @@ class Grade {
             trackerScore = enhancedTrackerScore
         )
 
-        return Scores(site = site, enhanced = enhanced)
+        return ScoresAvailable(site = site, enhanced = enhanced)
     }
+
+    private fun scoresUnavailable() = ScoresUnavailable
 
     private fun gradeForScore(score: Int): Grading {
         return when {
@@ -148,26 +172,25 @@ class Grade {
         }
     }
 
-    fun setParentEntityAndPrevalence(parentEntity: String?, prevalence: Double?) {
-        parentEntity ?: return
-        addEntityNotBlocked(parentEntity, prevalence)
+    private fun setParentEntity(parentEntity: Entity) {
+        addEntityNotBlocked(parentEntity)
     }
 
-    fun addEntityNotBlocked(entity: String, prevalence: Double?) {
-        prevalence ?: return
-        entitiesNotBlocked[entity] = prevalence
+    fun addEntityNotBlocked(entity: Entity?) {
+        entity?.let {
+            entitiesNotBlocked = entitiesNotBlocked.plus(entity.name to entity.prevalence)
+        }
     }
 
-    fun addEntityBlocked(entity: String, prevalence: Double?) {
-        prevalence ?: return
-        entitiesBlocked[entity] = prevalence
+    fun addEntityBlocked(entity: Entity?) {
+        entity?.let {
+            entitiesBlocked = entitiesBlocked.plus(entity.name to entity.prevalence)
+        }
     }
 
     companion object {
-
         const val UNKNOWN_PRIVACY_SCORE = 2
         const val MAX_PRIVACY_SCORE = 10
-
     }
 
 }

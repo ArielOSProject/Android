@@ -87,6 +87,34 @@ class UriExtensionTest {
     }
 
     @Test
+    fun whenUriIsHttpsAndOtherIsHttpButOtherwiseIdenticalThenIsHttpsVersionOfOtherIsTrue() {
+        val uri = Uri.parse("https://example.com")
+        val other = Uri.parse("http://example.com")
+        assertTrue(uri.isHttpsVersionOfUri(other))
+    }
+
+    @Test
+    fun whenUriIsHttpsAndOtherIsHttpButNotOtherwiseIdenticalThenIsHttpsVersionOfOtherIsFalse() {
+        val uri = Uri.parse("https://example.com")
+        val other = Uri.parse("http://example.com/path")
+        assertFalse(uri.isHttpsVersionOfUri(other))
+    }
+
+    @Test
+    fun whenUriIsHttpThenIsHttpsVersionOfOtherIsFalse() {
+        val uri = Uri.parse("http://example.com")
+        val other = Uri.parse("http://example.com")
+        assertFalse(uri.isHttpsVersionOfUri(other))
+    }
+
+    @Test
+    fun whenUriIsHttpsAndOtherIsHttpsThenIsHttpsVersionOfOtherIsFalse() {
+        val uri = Uri.parse("https://example.com")
+        val other = Uri.parse("https://example.com")
+        assertFalse(uri.isHttpsVersionOfUri(other))
+    }
+
+    @Test
     fun whenUriIsMalformedThenIsHtpsIsFalse() {
         assertFalse(Uri.parse("[example com]").isHttps)
     }
@@ -95,6 +123,22 @@ class UriExtensionTest {
     fun whenIpUriThenHasIpHostIsTrue() {
         assertTrue(Uri.parse("https://54.229.105.203/something").hasIpHost)
         assertTrue(Uri.parse("54.229.105.203/something").hasIpHost)
+    }
+
+    @Test
+    fun whenIpWithPortUriThenHasIpHostIsTrue() {
+        assertTrue(Uri.parse("https://54.229.105.203:999/something").hasIpHost)
+        assertTrue(Uri.parse("54.229.105.203:999/something").hasIpHost)
+    }
+
+    @Test
+    fun whenIpWithPortUriThenPortNumberParsedSuccessfully() {
+        assertEquals(999, Uri.parse("https://54.229.105.203:999/something").port)
+    }
+
+    @Test
+    fun whenValidIpAddressWithPortParsedWithSchemeThenPortNumberParsedSuccessfully() {
+        assertEquals(999, Uri.parse("121.33.2.11:999").withScheme().port)
     }
 
     @Test

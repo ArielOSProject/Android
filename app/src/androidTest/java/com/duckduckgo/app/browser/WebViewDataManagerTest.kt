@@ -19,13 +19,16 @@ package com.duckduckgo.app.browser
 import android.content.Context
 import android.webkit.WebStorage
 import android.webkit.WebView
-import androidx.test.annotation.UiThreadTest
+import android.webkit.WebViewDatabase
 import androidx.test.platform.app.InstrumentationRegistry
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.fire.DuckDuckGoCookieManager
+import com.duckduckgo.app.global.file.FileDeleter
 import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.verify
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,29 +37,70 @@ class WebViewDataManagerTest {
 
     private val mockCookieManager: DuckDuckGoCookieManager = mock()
     private val mockStorage: WebStorage = mock()
-    private val testee = WebViewDataManager(WebViewSessionInMemoryStorage(), mockCookieManager)
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val mockFileDeleter: FileDeleter = mock()
+    private val mockWebViewDatabase: WebViewDatabase = mock()
+    private val testee = WebViewDataManager(context, WebViewSessionInMemoryStorage(), mockCookieManager, mockFileDeleter)
 
-    @UiThreadTest
     @Test
-    fun whenDataClearedThenCacheHistoryAndStorageDataCleared() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val webView = TestWebView(context)
-        testee.clearData(webView, mockStorage, context)
-        assertTrue(webView.historyCleared)
-        assertTrue(webView.cacheCleared)
-        verify(mockStorage).deleteAllData()
+    fun whenDataClearedThenWebViewHistoryCleared() = runBlocking<Unit> {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+            testee.clearData(webView, mockStorage, mockWebViewDatabase)
+            assertTrue(webView.historyCleared)
+        }
     }
 
     @Test
-    fun whenExternalCookiesClearedThenCookiesRemoved() = runBlocking<Unit> {
-        testee.clearExternalCookies()
-        verify(mockCookieManager).removeExternalCookies()
+    fun whenDataClearedThenWebViewCacheCleared() = runBlocking<Unit> {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+            testee.clearData(webView, mockStorage, mockWebViewDatabase)
+            assertTrue(webView.cacheCleared)
+        }
+    }
+
+    @Test
+    fun whenDataClearedThenWebViewFormDataCleared() = runBlocking<Unit> {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+            testee.clearData(webView, mockStorage, mockWebViewDatabase)
+            assertTrue(webView.clearedFormData)
+        }
+    }
+
+    @Test
+    fun whenDataClearedThenWebViewWebStorageCleared() = runBlocking<Unit> {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+            testee.clearData(webView, mockStorage, mockWebViewDatabase)
+            verify(mockStorage).deleteAllData()
+        }
+    }
+
+    @Test
+    fun whenDataClearedThenWebViewAuthCredentialsCleared() = runBlocking<Unit> {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+            testee.clearData(webView, mockStorage, mockWebViewDatabase)
+            verify(mockWebViewDatabase).clearHttpAuthUsernamePassword()
+        }
+    }
+
+    @Test
+    fun whenDataClearedThenWebViewCookiesRemoved() = runBlocking<Unit> {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+            testee.clearData(webView, mockStorage, mockWebViewDatabase)
+            verify(mockCookieManager).removeExternalCookies()
+        }
     }
 
     private class TestWebView(context: Context) : WebView(context) {
 
         var historyCleared: Boolean = false
         var cacheCleared: Boolean = false
+        var clearedFormData: Boolean = false
 
         override fun clearHistory() {
             super.clearHistory()
@@ -70,6 +114,11 @@ class WebViewDataManagerTest {
             if (includeDiskFiles) {
                 cacheCleared = true
             }
+        }
+
+        override fun clearFormData() {
+            super.clearFormData()
+            clearedFormData = true
         }
     }
 }

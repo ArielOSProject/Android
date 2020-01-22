@@ -16,12 +16,13 @@
 
 package com.duckduckgo.app.privacy.model
 
-import com.duckduckgo.app.entities.EntityMapping
 import com.duckduckgo.app.global.UriString.Companion.sameOrSubdomain
+import com.duckduckgo.app.global.initialization.DataLoadable
 import com.duckduckgo.app.privacy.store.TermsOfServiceStore
+import com.duckduckgo.app.trackerdetection.EntityLookup
 import javax.inject.Inject
 
-interface PrivacyPractices {
+interface PrivacyPractices : DataLoadable {
 
     enum class Summary {
         POOR,
@@ -30,13 +31,13 @@ interface PrivacyPractices {
         UNKNOWN
     }
 
-    data class Practices(val score: Int, val summary: PrivacyPractices.Summary, val goodReasons: List<String>, val badReasons: List<String>)
+    data class Practices(val score: Int, val summary: Summary, val goodReasons: List<String>, val badReasons: List<String>)
 
-    fun privacyPracticesFor(url: String): PrivacyPractices.Practices
+    fun privacyPracticesFor(url: String): Practices
 
     companion object {
 
-        val UNKNOWN = PrivacyPractices.Practices(2, PrivacyPractices.Summary.UNKNOWN, emptyList(), emptyList())
+        val UNKNOWN = Practices(2, Summary.UNKNOWN, emptyList(), emptyList())
 
     }
 
@@ -44,30 +45,24 @@ interface PrivacyPractices {
 
 class PrivacyPracticesImpl @Inject constructor(
     private val termsOfServiceStore: TermsOfServiceStore,
-    private val entityMapping: EntityMapping
+    private val entityLookup: EntityLookup
 ) : PrivacyPractices {
 
 
     private var entityScores: Map<String, Int> = mapOf()
 
-    init {
-        refreshScores()
-    }
-
-    private fun refreshScores() {
+    override suspend fun loadData() {
         val entityScores: MutableMap<String, Int> = mutableMapOf()
 
         termsOfServiceStore.terms.forEach {
             val url = it.name ?: return@forEach
             val derivedScore = it.derivedScore
 
-            entityMapping.entityForUrl(url)?.let {
-
-                val entityScore = entityScores[it.entityName]
+            entityLookup.entityForUrl(url)?.let { entity ->
+                val entityScore = entityScores[entity.name]
                 if (entityScore == null || entityScore < derivedScore) {
-                    entityScores[it.entityName] = derivedScore
+                    entityScores[entity.name] = derivedScore
                 }
-
             }
         }
 
@@ -75,9 +70,9 @@ class PrivacyPracticesImpl @Inject constructor(
     }
 
     override fun privacyPracticesFor(url: String): PrivacyPractices.Practices {
-        val entity = entityMapping.entityForUrl(url)
+        val entity = entityLookup.entityForUrl(url)
         val terms = termsOfServiceStore.terms.find { sameOrSubdomain(url, it.name ?: "") } ?: return PrivacyPractices.UNKNOWN
-        val score = entityScores[entity?.entityName] ?: terms.derivedScore
+        val score = entityScores[entity?.name] ?: terms.derivedScore
         return PrivacyPractices.Practices(score, terms.practices, terms.goodPrivacyTerms, terms.badPrivacyTerms)
     }
 

@@ -16,6 +16,8 @@
 
 package com.duckduckgo.app.statistics.api
 
+import android.net.Uri
+import androidx.core.net.toUri
 import androidx.test.platform.app.InstrumentationRegistry
 import com.duckduckgo.app.FileUtilities.loadText
 import com.duckduckgo.app.InstantSchedulersRule
@@ -31,6 +33,7 @@ import com.squareup.moshi.Moshi
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -39,6 +42,9 @@ import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 
@@ -64,12 +70,28 @@ class StatisticsRequesterJsonTest {
         statisticsStore.clearAtb()
 
         testee = StatisticsRequester(statisticsStore, statisticsService, mockVariantManager)
-        whenever(mockVariantManager.getVariant()).thenReturn(Variant("ma", 100.0))
+        whenever(mockVariantManager.getVariant()).thenReturn(Variant("ma", 100.0, filterBy = { true }))
     }
 
     @After
     fun tearDown() {
         server.shutdown()
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshSearchRetentionCallWithUpdateVersionResponseUpdatesAtb() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        queueResponseFromFile(VALID_UPDATE_RESPONSE_JSON)
+        testee.refreshSearchRetentionAtb()
+        assertEquals("v99-1", statisticsStore.atb?.version)
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshAppRetentionCallWithUpdateVersionResponseUpdatesAtb() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        queueResponseFromFile(VALID_UPDATE_RESPONSE_JSON)
+        testee.refreshAppRetentionAtb()
+        assertEquals("v99-1", statisticsStore.atb?.version)
     }
 
     @Test
@@ -129,7 +151,7 @@ class StatisticsRequesterJsonTest {
         queueResponseFromString("", 200)
         testee.initializeAtb()
         val request = takeRequestImmediately()
-        assertEquals("/atb.js", request.requestUrl.encodedPath())
+        assertEquals("/atb.js", request.encodedPath())
     }
 
     @Test
@@ -138,7 +160,7 @@ class StatisticsRequesterJsonTest {
         queueResponseFromString("", 200)
         testee.initializeAtb()
         val atbRequest = takeRequestImmediately()
-        val testParam = atbRequest.requestUrl.queryParameter(ParamKey.DEV_MODE)
+        val testParam = atbRequest.extractQueryParam(ParamKey.DEV_MODE)
         assertTestParameterSent(testParam)
     }
 
@@ -149,7 +171,7 @@ class StatisticsRequesterJsonTest {
         testee.initializeAtb()
         takeRequestImmediately()
         val extiRequest = takeRequestImmediately()
-        assertEquals("/exti/", extiRequest.requestUrl.encodedPath())
+        assertEquals("/exti/", extiRequest.encodedPath())
     }
 
     @Test
@@ -159,7 +181,7 @@ class StatisticsRequesterJsonTest {
         testee.initializeAtb()
         takeRequestImmediately()
         val extiRequest = takeRequestImmediately()
-        val testParam = extiRequest.requestUrl.queryParameter(ParamKey.DEV_MODE)
+        val testParam = extiRequest.extractQueryParam(ParamKey.DEV_MODE)
         assertTestParameterSent(testParam)
     }
 
@@ -170,56 +192,106 @@ class StatisticsRequesterJsonTest {
         testee.initializeAtb()
         takeRequestImmediately()
         val extiRequest = takeRequestImmediately()
-        val atbQueryParam = extiRequest.requestUrl.queryParameter("atb")
+        val atbQueryParam = extiRequest.extractQueryParam("atb")
         assertNotNull(atbQueryParam)
         assertEquals("v105-3ma", atbQueryParam)
     }
 
     @Test
-    fun whenAlreadyInitializedRefreshCallGoesToCorrectEndpoint() {
+    fun whenAlreadyInitializedRefreshSearchCallGoesToCorrectEndpoint() {
         statisticsStore.saveAtb(Atb("100-1"))
         queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
-        testee.refreshRetentionAtb()
+        testee.refreshSearchRetentionAtb()
         val refreshRequest = takeRequestImmediately()
-        assertEquals("/atb.js", refreshRequest.requestUrl.encodedPath())
+        assertEquals("/atb.js", refreshRequest.encodedPath())
+        assertNull(refreshRequest.extractQueryParam("at"))
     }
 
     @Test
-    fun whenAlreadyInitializedRefreshCallUpdatesRetentionAtb() {
+    fun whenAlreadyInitializedRefreshAppCallGoesToCorrectEndpoint() {
         statisticsStore.saveAtb(Atb("100-1"))
         queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
-        testee.refreshRetentionAtb()
-        assertEquals("v107-7", statisticsStore.retentionAtb)
+        testee.refreshAppRetentionAtb()
+        val refreshRequest = takeRequestImmediately()
+        assertEquals("/atb.js", refreshRequest.encodedPath())
+        assertEquals("app_use", refreshRequest.extractQueryParam("at"))
     }
 
     @Test
-    fun whenAlreadyInitializedRefreshCallSendsTestParameter() {
+    fun whenAlreadyInitializedRefreshSearchCallUpdatesSearchRetentionAtb() {
         statisticsStore.saveAtb(Atb("100-1"))
         queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
-        testee.refreshRetentionAtb()
+        testee.refreshSearchRetentionAtb()
+        assertEquals("v107-7", statisticsStore.searchRetentionAtb)
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshAppCallUpdatesAppRetentionAtb() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
+        testee.refreshAppRetentionAtb()
+        assertEquals("v107-7", statisticsStore.appRetentionAtb)
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshSearchCallSendsTestParameter() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
+        testee.refreshSearchRetentionAtb()
         val refreshRequest = takeRequestImmediately()
-        val testParam = refreshRequest.requestUrl.queryParameter(ParamKey.DEV_MODE)
+        val testParam = refreshRequest.extractQueryParam(ParamKey.DEV_MODE)
         assertTestParameterSent(testParam)
     }
 
     @Test
-    fun whenAlreadyInitializedRefreshCallSendsCorrectAtb() {
+    fun whenAlreadyInitializedRefreshAppCallSendsTestParameter() {
         statisticsStore.saveAtb(Atb("100-1"))
         queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
-        testee.refreshRetentionAtb()
+        testee.refreshAppRetentionAtb()
         val refreshRequest = takeRequestImmediately()
-        val atbParam = refreshRequest.requestUrl.queryParameter(ParamKey.ATB)
+        val testParam = refreshRequest.extractQueryParam(ParamKey.DEV_MODE)
+        assertTestParameterSent(testParam)
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshSearchCallSendsCorrectAtb() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
+        testee.refreshSearchRetentionAtb()
+        val refreshRequest = takeRequestImmediately()
+        val atbParam = refreshRequest.extractQueryParam(ParamKey.ATB)
         assertEquals("100-1ma", atbParam)
     }
 
     @Test
-    fun whenAlreadyInitializedRefreshCallSendsCorrectRetentionAtb() {
+    fun whenAlreadyInitializedRefreshAppCallSendsCorrectAtb() {
         statisticsStore.saveAtb(Atb("100-1"))
-        statisticsStore.retentionAtb = "101-3"
         queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
-        testee.refreshRetentionAtb()
+        testee.refreshAppRetentionAtb()
         val refreshRequest = takeRequestImmediately()
-        val atbParam = refreshRequest.requestUrl.queryParameter(ParamKey.RETENTION_ATB)
+        val atbParam = refreshRequest.extractQueryParam(ParamKey.ATB)
+        assertEquals("100-1ma", atbParam)
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshSearchCallSendsCorrectRetentionAtb() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        statisticsStore.searchRetentionAtb = "101-3"
+        queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
+        testee.refreshSearchRetentionAtb()
+        val refreshRequest = takeRequestImmediately()
+        val atbParam = refreshRequest.extractQueryParam(ParamKey.RETENTION_ATB)
+        assertEquals("101-3", atbParam)
+    }
+
+    @Test
+    fun whenAlreadyInitializedRefreshAppCallSendsCorrectRetentionAtb() {
+        statisticsStore.saveAtb(Atb("100-1"))
+        statisticsStore.appRetentionAtb = "101-3"
+        queueResponseFromFile(VALID_REFRESH_RESPONSE_JSON)
+        testee.refreshAppRetentionAtb()
+        val refreshRequest = takeRequestImmediately()
+        val atbParam = refreshRequest.extractQueryParam(ParamKey.RETENTION_ATB)
         assertEquals("101-3", atbParam)
     }
 
@@ -245,6 +317,7 @@ class StatisticsRequesterJsonTest {
         queueResponse(response)
     }
 
+    @Suppress("SameParameterValue")
     private fun queueResponseFromString(responseBody: String, responseCode: Int = 200) {
         val response = MockResponse()
             .setBody(responseBody)
@@ -263,10 +336,11 @@ class StatisticsRequesterJsonTest {
         server.start()
 
         val okHttpClient = OkHttpClient.Builder()
+            .proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(InetAddress.getLocalHost(), server.port)))
             .build()
 
         val retrofit = Retrofit.Builder()
-            .baseUrl(server.url("/").toString())
+            .baseUrl(server.url("localhost/").toString())
             .client(okHttpClient)
             .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
             .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
@@ -279,9 +353,22 @@ class StatisticsRequesterJsonTest {
         assertEquals(expectedRequests, server.requestCount)
     }
 
+    private fun RecordedRequest.requestUri(): Uri {
+        return path.toUri()
+    }
+
+    private fun RecordedRequest.extractQueryParam(keyName: String): String? {
+        return requestUri().getQueryParameter(keyName)
+    }
+
+    private fun RecordedRequest.encodedPath(): String? {
+        return requestUri().encodedPath
+    }
+
     companion object {
         private const val VALID_JSON = "atb_response_valid.json"
         private const val VALID_REFRESH_RESPONSE_JSON = "atb_refresh_response_valid.json"
+        private const val VALID_UPDATE_RESPONSE_JSON = "atb_update_response_valid.json"
         private const val INVALID_JSON_MISSING_VERSION = "atb_response_invalid_missing_version.json"
         private const val INVALID_JSON_CORRUPT_JSON = "atb_response_invalid_malformed_json.json"
 

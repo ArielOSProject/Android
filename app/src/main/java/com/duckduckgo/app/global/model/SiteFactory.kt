@@ -16,9 +16,11 @@
 
 package com.duckduckgo.app.global.model
 
+import androidx.annotation.AnyThread
+import androidx.annotation.WorkerThread
 import com.duckduckgo.app.privacy.model.PrivacyPractices
-import com.duckduckgo.app.privacy.store.PrevalenceStore
-import com.duckduckgo.app.trackerdetection.model.TrackerNetworks
+import com.duckduckgo.app.trackerdetection.EntityLookup
+import com.duckduckgo.app.trackerdetection.model.Entity
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,18 +28,35 @@ import javax.inject.Singleton
 @Singleton
 class SiteFactory @Inject constructor(
     private val privacyPractices: PrivacyPractices,
-    private val trackerNetworks: TrackerNetworks,
-    private val prevalenceStore: PrevalenceStore
+    private val entityLookup: EntityLookup
 ) {
 
-    fun build(url: String, title: String? = null): Site {
-        val practices = privacyPractices.privacyPracticesFor(url)
-        val memberNetwork = trackerNetworks.network(url)
-        val site = SiteMonitor(url, practices, memberNetwork, prevalenceStore)
-        title?.let {
-            site.title = it
-        }
-        return site
+    /**
+     * Builds a Site with minimal details; this is quick to build but won't contain the full details needed for all functionality
+     *
+     * @see [loadFullSiteDetails] to ensure full privacy details are loaded
+     */
+    @AnyThread
+    fun buildSite(url: String, title: String? = null): Site {
+        return SiteMonitor(url, title)
     }
 
+    /**
+     * Updates the given Site with the full details
+     *
+     * This can be expensive to execute.
+     */
+    @WorkerThread
+    fun loadFullSiteDetails(site: Site) {
+        val practices = privacyPractices.privacyPracticesFor(site.url)
+        val memberNetwork = entityLookup.entityForUrl(site.url)
+        val siteDetails = SitePrivacyData(site.url, practices, memberNetwork, memberNetwork?.prevalence ?: 0.0)
+        site.updatePrivacyData(siteDetails)
+    }
+
+    data class SitePrivacyData(
+        val url: String, val practices: PrivacyPractices.Practices,
+        val entity: Entity?,
+        val prevalence: Double?
+    )
 }

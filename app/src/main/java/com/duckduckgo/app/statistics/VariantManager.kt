@@ -18,29 +18,54 @@ package com.duckduckgo.app.statistics
 
 import androidx.annotation.WorkerThread
 import com.duckduckgo.app.statistics.VariantManager.Companion.DEFAULT_VARIANT
+import com.duckduckgo.app.statistics.VariantManager.Companion.referrerVariant
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import timber.log.Timber
+import java.util.*
 
 @WorkerThread
 interface VariantManager {
 
     sealed class VariantFeature {
+        // variant-dependant features listed here
+        object ConceptTest : VariantFeature()
+
+        object ExistingNoCta : VariantFeature()
     }
 
     companion object {
 
         // this will be returned when there are no other active experiments
-        val DEFAULT_VARIANT = Variant(key = "", features = emptyList())
+        val DEFAULT_VARIANT = Variant(key = "", features = emptyList(), filterBy = { noFilter() })
 
         val ACTIVE_VARIANTS = listOf(
 
-            // Shared control. You can use this as your control unless you are experimenting on
-            // a subgroup e.g a device API or specific language
-            Variant(key = "sc", weight = 1.0, features = emptyList())
+            // SERP variants. "sc" may also be used as a shared control for mobile experiments in
+            // the future if we can filter by app version
+            Variant(key = "sc", weight = 0.0, features = emptyList(), filterBy = { noFilter() }),
+            Variant(key = "se", weight = 0.0, features = emptyList(), filterBy = { noFilter() }),
+            Variant(key = "mc", weight = 1.0, features = emptyList(), filterBy = { isEnglishLocale() }),
+            Variant(key = "me", weight = 1.0, features = listOf(VariantFeature.ConceptTest), filterBy = { isEnglishLocale() }),
+            Variant(key = "md", weight = 1.0, features = listOf(VariantFeature.ExistingNoCta), filterBy = { isEnglishLocale() })
+
+            // All groups in an experiment (control and variants) MUST use the same filters
         )
+
+        fun referrerVariant(key: String): Variant {
+            return Variant(key, features = emptyList(), filterBy = { noFilter() })
+        }
+
+        private fun noFilter(): Boolean = true
+
+        private fun isEnglishLocale(): Boolean {
+            val locale = Locale.getDefault()
+            return locale != null && locale.language == "en"
+        }
     }
 
     fun getVariant(activeVariants: List<Variant> = ACTIVE_VARIANTS): Variant
+
+    fun updateAppReferrerVariant(variant: String)
 }
 
 class ExperimentationVariantManager(
@@ -50,19 +75,18 @@ class ExperimentationVariantManager(
 
     @Synchronized
     override fun getVariant(activeVariants: List<Variant>): Variant {
-        if (activeVariants.isEmpty()) return DEFAULT_VARIANT
-
         val currentVariantKey = store.variant
 
         if (currentVariantKey == DEFAULT_VARIANT.key) {
             return DEFAULT_VARIANT
         }
 
-        if (currentVariantKey == null) {
-            val newVariant = generateVariant(activeVariants)
-            Timber.i("Current variant is null; allocating new one $newVariant")
-            persistVariant(newVariant)
-            return newVariant
+        if (currentVariantKey != null && matchesReferrerVariant(currentVariantKey)) {
+            return referrerVariant(currentVariantKey)
+        }
+
+        if (currentVariantKey == null || activeVariants.isEmpty()) {
+            return allocateNewVariant(activeVariants)
         }
 
         val currentVariant = lookupVariant(currentVariantKey, activeVariants)
@@ -76,14 +100,50 @@ class ExperimentationVariantManager(
         return currentVariant
     }
 
-    private fun lookupVariant(key: String?, activeVariants: List<Variant>): Variant? =
-        activeVariants.firstOrNull { it.key == key }
+    private fun allocateNewVariant(activeVariants: List<Variant>): Variant {
+        var newVariant = generateVariant(activeVariants)
+        val compliesWithFilters = newVariant.filterBy()
+
+        if (!compliesWithFilters) {
+            newVariant = DEFAULT_VARIANT
+        }
+        Timber.i("Current variant is null; allocating new one $newVariant")
+        persistVariant(newVariant)
+        return newVariant
+    }
+
+    override fun updateAppReferrerVariant(variant: String) {
+        Timber.i("Updating variant for app referer: $variant")
+        store.variant = variant
+        store.referrerVariant = variant
+    }
+
+    private fun lookupVariant(key: String?, activeVariants: List<Variant>): Variant? {
+        val variant = activeVariants.firstOrNull { it.key == key }
+
+        if (variant != null) return variant
+
+        if (key != null && matchesReferrerVariant(key)) {
+            return referrerVariant(key)
+        }
+
+        return null
+    }
 
     private fun persistVariant(newVariant: Variant) {
         store.variant = newVariant.key
     }
 
+    private fun matchesReferrerVariant(key: String): Boolean {
+        return key == store.referrerVariant
+    }
+
     private fun generateVariant(activeVariants: List<Variant>): Variant {
+        val weightSum = activeVariants.sumByDouble { it.weight }
+        if (weightSum == 0.0) {
+            Timber.v("No variants active; allocating default")
+            return DEFAULT_VARIANT
+        }
         val randomizedIndex = indexRandomizer.random(activeVariants)
         return activeVariants[randomizedIndex]
     }
@@ -97,7 +157,8 @@ class ExperimentationVariantManager(
 data class Variant(
     val key: String,
     override val weight: Double = 0.0,
-    val features: List<VariantManager.VariantFeature> = emptyList()
+    val features: List<VariantManager.VariantFeature> = emptyList(),
+    val filterBy: () -> Boolean
 ) : Probabilistic {
 
     fun hasFeature(feature: VariantManager.VariantFeature) = features.contains(feature)

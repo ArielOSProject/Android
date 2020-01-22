@@ -17,6 +17,7 @@
 package com.duckduckgo.app.fire
 
 import android.os.Handler
+import android.os.SystemClock
 import androidx.annotation.UiThread
 import androidx.core.os.postDelayed
 import androidx.lifecycle.*
@@ -40,12 +41,14 @@ interface DataClearer : LifecycleObserver {
 }
 
 class AutomaticDataClearer(
+    private val workManager: WorkManager,
     private val settingsDataStore: SettingsDataStore,
     private val clearDataAction: ClearDataAction,
     private val dataClearerTimeKeeper: BackgroundTimeKeeper
 ) : DataClearer, LifecycleObserver, CoroutineScope {
 
     private val clearJob: Job = Job()
+
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Main + clearJob
 
@@ -70,7 +73,7 @@ class AutomaticDataClearer(
 
         Timber.i("onAppForegrounded; is from fresh app launch? $isFreshAppLaunch")
 
-        WorkManager.getInstance().cancelAllWorkByTag(DataClearingWorker.WORK_REQUEST_TAG)
+        workManager.cancelAllWorkByTag(DataClearingWorker.WORK_REQUEST_TAG)
 
         val appUsedSinceLastClear = settingsDataStore.appUsedSinceLastClear
         settingsDataStore.appUsedSinceLastClear = true
@@ -99,11 +102,12 @@ class AutomaticDataClearer(
     @UiThread
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     fun onAppBackgrounded() {
-        Timber.i("Recording when app backgrounded")
+        val timeNow = SystemClock.elapsedRealtime()
+        Timber.i("Recording when app backgrounded ($timeNow)")
 
         dataClearerState.value = INITIALIZING
 
-        settingsDataStore.appBackgroundedTimestamp = System.currentTimeMillis()
+        settingsDataStore.appBackgroundedTimestamp = timeNow
 
         val clearWhenOption = settingsDataStore.automaticallyClearWhenOption
         val clearWhatOption = settingsDataStore.automaticallyClearWhatOption
@@ -116,7 +120,7 @@ class AutomaticDataClearer(
     }
 
     private fun scheduleBackgroundTimerToTriggerClear(durationMillis: Long) {
-        WorkManager.getInstance().also {
+        workManager.also {
             val workRequest = OneTimeWorkRequestBuilder<DataClearingWorker>()
                 .setInitialDelay(durationMillis, TimeUnit.MILLISECONDS)
                 .addTag(DataClearingWorker.WORK_REQUEST_TAG)

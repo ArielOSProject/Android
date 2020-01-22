@@ -16,13 +16,20 @@
 
 package com.duckduckgo.app.di
 
+import android.content.Context
+import com.duckduckgo.app.global.device.ContextDeviceInfo
+import com.duckduckgo.app.global.device.DeviceInfo
+import com.duckduckgo.app.referral.AppInstallationReferrerStateListener
+import com.duckduckgo.app.statistics.AtbInitializer
 import com.duckduckgo.app.statistics.api.StatisticsService
 import com.duckduckgo.app.statistics.api.StatisticsUpdater
 import com.duckduckgo.app.statistics.pixels.Pixel
+import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import dagger.Module
 import dagger.Provides
 import io.reactivex.Completable
 import retrofit2.Retrofit
+import javax.inject.Singleton
 
 @Module
 class StubStatisticsModule {
@@ -34,11 +41,16 @@ class StubStatisticsModule {
     @Provides
     fun stubStatisticsUpdater(): StatisticsUpdater {
         return object : StatisticsUpdater {
-            override fun refreshRetentionAtb() {
-            }
 
             override fun initializeAtb() {
             }
+
+            override fun refreshAppRetentionAtb() {
+            }
+
+            override fun refreshSearchRetentionAtb() {
+            }
+
         }
     }
 
@@ -57,5 +69,18 @@ class StubStatisticsModule {
                 return Completable.fromAction {}
             }
         }
+    }
+
+    @Provides
+    fun deviceInfo(context: Context): DeviceInfo = ContextDeviceInfo(context)
+
+    @Provides
+    @Singleton
+    fun atbInitializer(
+        statisticsDataStore: StatisticsDataStore,
+        statisticsUpdater: StatisticsUpdater,
+        appReferrerStateListener: AppInstallationReferrerStateListener
+    ): AtbInitializer {
+        return AtbInitializer(statisticsDataStore, statisticsUpdater, appReferrerStateListener)
     }
 }

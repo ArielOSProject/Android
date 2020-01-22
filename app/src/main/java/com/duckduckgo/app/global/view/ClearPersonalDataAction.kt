@@ -17,16 +17,16 @@
 package com.duckduckgo.app.global.view
 
 import android.content.Context
-import android.util.Log
 import android.webkit.WebStorage
 import android.webkit.WebView
+import android.webkit.WebViewDatabase
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
 import com.duckduckgo.app.browser.WebDataManager
+import com.duckduckgo.app.fire.AppCacheClearer
 import com.duckduckgo.app.fire.DuckDuckGoCookieManager
 import com.duckduckgo.app.fire.FireActivity
 import com.duckduckgo.app.fire.UnsentForgetAllPixelStore
-import com.duckduckgo.app.global.performance.measureExecution
 import com.duckduckgo.app.settings.db.SettingsDataStore
 import com.duckduckgo.app.tabs.model.TabRepository
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +54,8 @@ class ClearPersonalDataAction @Inject constructor(
     private val clearingStore: UnsentForgetAllPixelStore,
     private val tabRepository: TabRepository,
     private val settingsDataStore: SettingsDataStore,
-    private val cookieManager: DuckDuckGoCookieManager
+    private val cookieManager: DuckDuckGoCookieManager,
+    private val appCacheClearer: AppCacheClearer
 ) : ClearDataAction, CoroutineScope {
 
     private val clearJob: Job = Job()
@@ -75,57 +76,50 @@ class ClearPersonalDataAction @Inject constructor(
     }
 
     override suspend fun clearTabsAndAllDataAsync(appInForeground: Boolean, shouldFireDataClearPixel: Boolean) {
-        measureExecution("Finished clearing everything", Log.INFO) {
-            withContext(Dispatchers.IO) {
-                cookieManager.flush()
-                clearTabsAsync(appInForeground)
-            }
-
-            withContext(Dispatchers.Main) {
-                clearDataAsync(shouldFireDataClearPixel)
-            }
+        withContext(Dispatchers.IO) {
+            cookieManager.flush()
+            clearTabsAsync(appInForeground)
         }
+
+        withContext(Dispatchers.Main) {
+            clearDataAsync(shouldFireDataClearPixel)
+        }
+        Timber.i("Finished clearing everything")
     }
 
     @WorkerThread
     override suspend fun clearTabsAsync(appInForeground: Boolean) {
-        measureExecution("Finished clearing tabs", Log.INFO) {
-            Timber.i("Clearing tabs")
-            dataManager.clearWebViewSessions()
-            tabRepository.deleteAll()
-            setAppUsedSinceLastClearFlag(appInForeground)
-        }
+        Timber.i("Clearing tabs")
+        dataManager.clearWebViewSessions()
+        tabRepository.deleteAll()
+        setAppUsedSinceLastClearFlag(appInForeground)
+        Timber.d("Finished clearing tabs")
     }
 
     @UiThread
     private suspend fun clearDataAsync(shouldFireDataClearPixel: Boolean) {
-        measureExecution("Finished clearing data", Log.INFO) {
-            Timber.i("Clearing data")
+        Timber.i("Clearing data")
 
-            if (shouldFireDataClearPixel) {
-                measureExecution("Incremented data-clear pixel count") { clearingStore.incrementCount() }
-            }
-
-            dataManager.clearData(createWebView(), createWebStorage(), context)
-            dataManager.clearExternalCookies()
+        if (shouldFireDataClearPixel) {
+            clearingStore.incrementCount()
         }
+
+        dataManager.clearData(createWebView(), createWebStorage(), WebViewDatabase.getInstance(context))
+        appCacheClearer.clearCache()
+
+        Timber.i("Finished clearing data")
     }
 
     private fun createWebView(): WebView {
-        return measureExecution("Created WebView instance for clearing") {
-            WebView(context)
-        }
+        return WebView(context)
     }
 
     private fun createWebStorage(): WebStorage {
-        return measureExecution("Created web storage") {
-            WebStorage.getInstance()
-        }
+        return WebStorage.getInstance()
     }
 
     override fun setAppUsedSinceLastClearFlag(appUsedSinceLastClear: Boolean) {
-        measureExecution("Set appUsedSinceClear flag to $appUsedSinceLastClear") {
-            settingsDataStore.appUsedSinceLastClear = appUsedSinceLastClear
-        }
+        settingsDataStore.appUsedSinceLastClear = appUsedSinceLastClear
+        Timber.d("Set appUsedSinceClear flag to $appUsedSinceLastClear")
     }
 }

@@ -72,6 +72,11 @@ class UriStringTest {
     }
 
     @Test
+    fun whenHostIsValidIpAddressWithPortThenIsWebUrlIsTrue() {
+        assertTrue(isWebUrl("121.33.2.11:999"))
+    }
+
+    @Test
     fun whenHostIsLocalhostThenIsWebUrlIsTrue() {
         assertTrue(isWebUrl("localhost"))
     }
@@ -104,6 +109,11 @@ class UriStringTest {
     @Test
     fun whenSchemeIsValidIpAddressThenIsWebUrlIsTrue() {
         assertTrue(isWebUrl("http://121.33.2.11"))
+    }
+
+    @Test
+    fun whenSchemeIsValidIpAddressWithPortThenIsWebUrlIsTrue() {
+        assertTrue(isWebUrl("http://121.33.2.11:999"))
     }
 
     @Test
@@ -167,6 +177,11 @@ class UriStringTest {
     }
 
     @Test
+    fun whenPathIsValidIpAddressWithPortThenIsWebUrlIsTrue() {
+        assertTrue(isWebUrl("http://121.33.2.11:999/path"))
+    }
+
+    @Test
     fun whenPathIsValidLocalhostThenIsWebUrlIsTrue() {
         assertTrue(isWebUrl("http://localhost/path"))
     }
@@ -214,6 +229,11 @@ class UriStringTest {
     @Test
     fun whenPathIsInvalidContainsSpaceMissingSchemeLocalhostThenIsWebUrlIsFalse() {
         assertFalse(isWebUrl("localhost/pa th"))
+    }
+
+    @Test
+    fun whenPathIsValidContainsEncodedSpaceNormalUrlThenIsWebUrlIsTrue() {
+        assertTrue(isWebUrl("http://www.example.com/pa%20th"))
     }
 
     @Test

@@ -29,24 +29,23 @@ class TabSwitcherViewModel(private val tabRepository: TabRepository, private val
 
     var tabs: LiveData<List<TabEntity>> = tabRepository.liveTabs
     val command: SingleLiveEvent<Command> = SingleLiveEvent()
-    var selectedTab: LiveData<TabEntity> = tabRepository.liveSelectedTab
 
     sealed class Command {
         data class DisplayMessage(@StringRes val messageId: Int) : Command()
         object Close : Command()
     }
 
-    fun onNewTabRequested() {
+    suspend fun onNewTabRequested() {
         tabRepository.add()
         command.value = Command.Close
     }
 
-    fun onTabSelected(tab: TabEntity) {
+    suspend fun onTabSelected(tab: TabEntity) {
         tabRepository.select(tab.tabId)
         command.value = Command.Close
     }
 
-    fun onTabDeleted(tab: TabEntity) {
+    suspend fun onTabDeleted(tab: TabEntity) {
         tabRepository.delete(tab)
         webViewSessionStorage.deleteSession(tab.tabId)
     }

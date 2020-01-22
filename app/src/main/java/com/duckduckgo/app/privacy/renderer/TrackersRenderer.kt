@@ -19,7 +19,8 @@ package com.duckduckgo.app.privacy.renderer
 import android.content.Context
 import androidx.annotation.DrawableRes
 import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.privacy.db.NetworkLeaderboardDao.NetworkTally
+import com.duckduckgo.app.privacy.db.NetworkLeaderboardEntry
+import java.util.*
 
 
 class TrackersRenderer {
@@ -56,16 +57,17 @@ class TrackersRenderer {
 
     private fun networkIcon(context: Context, networkName: String, prefix: String): Int? {
         val drawable = "$prefix$networkName"
-            .replace(" ", "")
+            .replace(" ", "_")
             .replace(".", "")
-            .toLowerCase()
+            .replace(",", "")
+            .toLowerCase(Locale.ROOT)
         val resource = context.resources.getIdentifier(drawable, "drawable", context.packageName)
         return if (resource != 0) resource else null
     }
 
-    fun networkPercentage(tally: NetworkTally, totalDomainsVisited: Int): String? {
-        if (totalDomainsVisited == 0 || tally.domainCount == 0) return ""
-        val to100 = ((tally.domainCount / totalDomainsVisited.toFloat()) * 100).toInt()
+    fun networkPercentage(network: NetworkLeaderboardEntry, totalDomainsVisited: Int): String? {
+        if (totalDomainsVisited == 0 || network.count == 0) return ""
+        val to100 = ((network.count / totalDomainsVisited.toFloat()) * 100).toInt()
         return "$to100%"
     }
 

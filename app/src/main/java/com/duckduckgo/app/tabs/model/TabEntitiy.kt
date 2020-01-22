@@ -31,8 +31,10 @@ data class TabEntity(
     @PrimaryKey var tabId: String,
     var url: String? = null,
     var title: String? = null,
+    var skipHome: Boolean = false,
     var viewed: Boolean = true,
-    var position: Int
+    var position: Int,
+    var tabPreviewFile: String? = null
 )
 
 val TabEntity.isBlank: Boolean

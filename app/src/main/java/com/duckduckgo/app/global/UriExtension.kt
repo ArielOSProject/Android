@@ -19,8 +19,13 @@ import android.net.Uri
 import android.net.Uri.parse
 import com.duckduckgo.app.global.UrlScheme.Companion.http
 
+val IP_REGEX = Regex("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:[0-9]+)?$")
+
 fun Uri.withScheme(): Uri {
-    if (scheme == null) {
+    // Uri.parse function falsely parses IP:PORT string.
+    // For example if input is "255.255.255.255:9999", it falsely flags 255.255.255.255 as the scheme.
+    // Therefore in the withScheme method, we need to parse it after manually inserting "http".
+    if (scheme == null || scheme!!.matches(IP_REGEX)) {
         return parse("$http://${toString()}")
     }
 
@@ -35,16 +40,22 @@ val Uri.baseHost: String?
     get() = withScheme().host?.removePrefix("www.")
 
 val Uri.isHttp: Boolean
-    get() = scheme?.equals(UrlScheme.http, true) ?: false
+    get() = scheme?.equals(http, true) ?: false
 
 val Uri.isHttps: Boolean
     get() = scheme?.equals(UrlScheme.https, true) ?: false
 
+val Uri.toHttps: Uri
+    get() = buildUpon().scheme(UrlScheme.https).build()
+
 val Uri.hasIpHost: Boolean
     get() {
-        val ipRegex = Regex("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
-        return baseHost?.matches(ipRegex) ?: false
+        return baseHost?.matches(IP_REGEX) ?: false
     }
+
+fun Uri.isHttpsVersionOfUri(other: Uri): Boolean {
+    return isHttps && other.isHttp && other.toHttps == this
+}
 
 private val MOBILE_URL_PREFIXES = listOf("m.", "mobile.")
 
@@ -61,13 +72,13 @@ fun Uri.toDesktopUri(): Uri {
         url.replaceFirst(prefix, "")
     }
 
-    return Uri.parse(newUrl)
+    return parse(newUrl)
 }
 
-private const val faviconBaseUrlFormat = "https://icons.duckduckgo.com/ip3/%s.ico"
+private const val faviconBaseUrlFormat = "https://proxy.duckduckgo.com/ip3/%s.ico"
 
 fun Uri?.faviconLocation(): Uri? {
     val host = this?.host
     if (host.isNullOrBlank()) return null
-    return Uri.parse(String.format(faviconBaseUrlFormat, host))
+    return parse(String.format(faviconBaseUrlFormat, host))
 }

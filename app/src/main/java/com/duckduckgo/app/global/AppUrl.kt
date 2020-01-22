@@ -36,6 +36,8 @@ class AppUrl {
         const val DEV_MODE = "test"
         const val FORM_FACTOR = "f"
         const val SAFE_SEARCH = "kp"
+        const val LANGUAGE = "lg"
+        const val COUNTRY = "co"
     }
 
     object ParamValue {

@@ -19,19 +19,20 @@ package com.duckduckgo.app.di
 import android.content.Context
 import com.duckduckgo.app.global.device.ContextDeviceInfo
 import com.duckduckgo.app.global.device.DeviceInfo
+import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
+import com.duckduckgo.app.referral.AppInstallationReferrerStateListener
+import com.duckduckgo.app.statistics.AtbInitializer
 import com.duckduckgo.app.statistics.VariantManager
-import com.duckduckgo.app.statistics.api.PixelService
-import com.duckduckgo.app.statistics.api.StatisticsRequester
-import com.duckduckgo.app.statistics.api.StatisticsService
-import com.duckduckgo.app.statistics.api.StatisticsUpdater
+import com.duckduckgo.app.statistics.api.*
 import com.duckduckgo.app.statistics.pixels.ApiBasedPixel
 import com.duckduckgo.app.statistics.pixels.Pixel
+import com.duckduckgo.app.statistics.store.OfflinePixelCountDataStore
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import dagger.Module
 import dagger.Provides
-import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import javax.inject.Named
+import javax.inject.Singleton
 
 
 @Module
@@ -49,15 +50,31 @@ class StatisticsModule {
         StatisticsRequester(statisticsDataStore, statisticsService, variantManager)
 
     @Provides
-    fun pixelService(@Named("pixel") okHttpClient: OkHttpClient, @Named("pixel") retrofit: Retrofit): PixelService {
+    fun pixelService(@Named("nonCaching") retrofit: Retrofit): PixelService {
         return retrofit.create(PixelService::class.java)
     }
-
-    @Provides
-    fun deviceInfo(context: Context): DeviceInfo = ContextDeviceInfo(context)
 
     @Provides
     fun pixel(pixelService: PixelService, statisticsDataStore: StatisticsDataStore, variantManager: VariantManager, deviceInfo: DeviceInfo): Pixel =
         ApiBasedPixel(pixelService, statisticsDataStore, variantManager, deviceInfo)
 
+    @Provides
+    fun offlinePixelSender(
+        offlinePixelCountDataStore: OfflinePixelCountDataStore,
+        uncaughtExceptionRepository: UncaughtExceptionRepository,
+        pixel: Pixel
+    ): OfflinePixelSender = OfflinePixelSender(offlinePixelCountDataStore, uncaughtExceptionRepository, pixel)
+
+    @Provides
+    fun deviceInfo(context: Context): DeviceInfo = ContextDeviceInfo(context)
+
+    @Provides
+    @Singleton
+    fun atbInitializer(
+        statisticsDataStore: StatisticsDataStore,
+        statisticsUpdater: StatisticsUpdater,
+        appReferrerStateListener: AppInstallationReferrerStateListener
+    ): AtbInitializer {
+        return AtbInitializer(statisticsDataStore, statisticsUpdater, appReferrerStateListener)
+    }
 }

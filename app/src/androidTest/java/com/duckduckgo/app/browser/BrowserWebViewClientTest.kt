@@ -17,15 +17,18 @@
 package com.duckduckgo.app.browser
 
 import android.content.Context
+import android.os.Build
+import android.webkit.CookieManager
+import android.webkit.HttpAuthHandler
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import androidx.test.annotation.UiThreadTest
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
-import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.store.StatisticsDataStore
-import com.nhaarman.mockitokotlin2.any
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.verify
+import com.duckduckgo.app.browser.model.BasicAuthenticationRequest
+import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
+import com.duckduckgo.app.statistics.store.OfflinePixelCountDataStore
+import com.nhaarman.mockitokotlin2.*
 import org.junit.Before
 import org.junit.Test
 
@@ -37,39 +40,90 @@ class BrowserWebViewClientTest {
     private val requestRewriter: RequestRewriter = mock()
     private val specialUrlDetector: SpecialUrlDetector = mock()
     private val requestInterceptor: RequestInterceptor = mock()
-    private val httpsUpgrader: HttpsUpgrader = mock()
-    private val statisticsDataStore: StatisticsDataStore = mock()
-    private val pixel: Pixel = mock()
     private val listener: WebViewClientListener = mock()
+    private val cookieManager: CookieManager = mock()
+    private val offlinePixelCountDataStore: OfflinePixelCountDataStore = mock()
+    private val uncaughtExceptionRepository: UncaughtExceptionRepository = mock()
 
     @UiThreadTest
     @Before
     fun setup() {
         webView = TestWebView(InstrumentationRegistry.getInstrumentation().targetContext)
-
-        testee = BrowserWebViewClient(requestRewriter, specialUrlDetector, requestInterceptor, httpsUpgrader, statisticsDataStore, pixel)
+        testee = BrowserWebViewClient(
+            requestRewriter,
+            specialUrlDetector,
+            requestInterceptor,
+            offlinePixelCountDataStore,
+            uncaughtExceptionRepository,
+            cookieManager
+        )
         testee.webViewClientListener = listener
     }
 
     @UiThreadTest
     @Test
-    fun whenOnPageStartedCalledThenListenerNotified() {
+    fun whenOnPageStartedCalledThenListenerInstructedToUpdateNavigationState() {
         testee.onPageStarted(webView, EXAMPLE_URL, null)
-        verify(listener).loadingStarted(EXAMPLE_URL)
+        verify(listener).navigationStateChanged(any())
     }
 
     @UiThreadTest
     @Test
-    fun whenOnPageFinishedCalledThenListenerNotified() {
-        testee.onPageFinished(webView, EXAMPLE_URL)
-        verify(listener).loadingFinished(EXAMPLE_URL)
+    fun whenOnPageStartedCalledWithSameUrlAsPreviousThenListenerNotifiedOfRefresh() {
+        testee.onPageStarted(webView, EXAMPLE_URL, null)
+        testee.onPageStarted(webView, EXAMPLE_URL, null)
+        verify(listener).pageRefreshed(EXAMPLE_URL)
     }
 
     @UiThreadTest
     @Test
-    fun whenOnPageFinishedCalledThenListenerInstructedToUpdateNavigationOptions() {
+    fun whenOnPageStartedCalledWithDifferentUrlToPreviousThenListenerNotNotifiedOfRefresh() {
+        testee.onPageStarted(webView, EXAMPLE_URL, null)
+        testee.onPageStarted(webView, "foo.com", null)
+        verify(listener, never()).pageRefreshed(any())
+    }
+
+    @UiThreadTest
+    @Test
+    fun whenOnPageFinishedCalledThenListenerInstructedToUpdateNavigationState() {
         testee.onPageFinished(webView, EXAMPLE_URL)
-        verify(listener).navigationOptionsChanged(any())
+        verify(listener).navigationStateChanged(any())
+    }
+
+    @UiThreadTest
+    @Test
+    fun whenOnReceivedHttpAuthRequestThenListenerNotified() {
+        val mockHandler = mock<HttpAuthHandler>()
+        val authenticationRequest = BasicAuthenticationRequest(mockHandler, EXAMPLE_URL, EXAMPLE_URL, EXAMPLE_URL)
+        testee.onReceivedHttpAuthRequest(webView, mockHandler, EXAMPLE_URL, EXAMPLE_URL)
+        verify(listener).requiresAuthentication(authenticationRequest)
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
+    fun whenRenderProcessGoneDueToCrashThenCrashDataStoreEntryIsIncremented() {
+        val detail: RenderProcessGoneDetail = mock()
+        whenever(detail.didCrash()).thenReturn(true)
+        testee.onRenderProcessGone(webView, detail)
+        verify(offlinePixelCountDataStore, times(1)).webRendererGoneCrashCount = 1
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
+    fun whenRenderProcessGoneDueToNonCrashThenOtherDataStoreEntryIsIncremented() {
+        val detail: RenderProcessGoneDetail = mock()
+        whenever(detail.didCrash()).thenReturn(false)
+        testee.onRenderProcessGone(webView, detail)
+        verify(offlinePixelCountDataStore, times(1)).webRendererGoneKilledCount = 1
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
+    fun whenRenderProcessGoneThenEmitEventIntoListener() {
+        val detail: RenderProcessGoneDetail = mock()
+        whenever(detail.didCrash()).thenReturn(true)
+        testee.onRenderProcessGone(webView, detail)
+        verify(listener, times(1)).recoverFromRenderProcessGone()
     }
 
     private class TestWebView(context: Context) : WebView(context)

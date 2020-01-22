@@ -24,16 +24,27 @@ import com.duckduckgo.app.browser.addtohome.AddToHomeCapabilityDetector
 import com.duckduckgo.app.browser.addtohome.AddToHomeSystemCapabilityDetector
 import com.duckduckgo.app.browser.defaultbrowsing.AndroidDefaultBrowserDetector
 import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserDetector
+import com.duckduckgo.app.browser.defaultbrowsing.DefaultBrowserObserver
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.browser.session.WebViewSessionStorage
+import com.duckduckgo.app.browser.tabpreview.FileBasedWebViewPreviewGenerator
+import com.duckduckgo.app.browser.tabpreview.FileBasedWebViewPreviewPersister
+import com.duckduckgo.app.browser.tabpreview.WebViewPreviewGenerator
+import com.duckduckgo.app.browser.tabpreview.WebViewPreviewPersister
 import com.duckduckgo.app.fire.DuckDuckGoCookieManager
 import com.duckduckgo.app.fire.WebViewCookieManager
 import com.duckduckgo.app.global.AppUrl
+import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
+import com.duckduckgo.app.global.file.FileDeleter
+import com.duckduckgo.app.global.install.AppInstallStore
 import com.duckduckgo.app.httpsupgrade.HttpsUpgrader
+import com.duckduckgo.app.privacy.db.PrivacyProtectionCountDao
 import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.pixels.Pixel
+import com.duckduckgo.app.statistics.store.OfflinePixelCountDataStore
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import com.duckduckgo.app.surrogates.ResourceSurrogates
+import com.duckduckgo.app.tabs.ui.GridViewColumnCalculator
 import com.duckduckgo.app.trackerdetection.TrackerDetector
 import dagger.Module
 import dagger.Provides
@@ -52,6 +63,25 @@ class BrowserModule {
     }
 
     @Provides
+    fun browserWebViewClient(
+        requestRewriter: RequestRewriter,
+        specialUrlDetector: SpecialUrlDetector,
+        requestInterceptor: RequestInterceptor,
+        offlinePixelCountDataStore: OfflinePixelCountDataStore,
+        uncaughtExceptionRepository: UncaughtExceptionRepository,
+        cookieManager: CookieManager
+    ): BrowserWebViewClient {
+        return BrowserWebViewClient(
+            requestRewriter,
+            specialUrlDetector,
+            requestInterceptor,
+            offlinePixelCountDataStore,
+            uncaughtExceptionRepository,
+            cookieManager
+        )
+    }
+
+    @Provides
     fun webViewLongPressHandler(context: Context, pixel: Pixel): LongPressHandler {
         return WebViewLongPressHandler(context, pixel)
     }
@@ -61,14 +91,28 @@ class BrowserModule {
         return AndroidDefaultBrowserDetector(context)
     }
 
+    @Provides
+    fun defaultBrowserObserver(
+        defaultBrowserDetector: DefaultBrowserDetector,
+        appInstallStore: AppInstallStore,
+        pixel: Pixel
+    ): DefaultBrowserObserver {
+        return DefaultBrowserObserver(defaultBrowserDetector, appInstallStore, pixel)
+    }
+
     @Singleton
     @Provides
     fun webViewSessionStorage(): WebViewSessionStorage = WebViewSessionInMemoryStorage()
 
     @Singleton
     @Provides
-    fun webDataManager(webViewSessionStorage: WebViewSessionStorage, cookieManager: DuckDuckGoCookieManager): WebDataManager =
-        WebViewDataManager(webViewSessionStorage, cookieManager)
+    fun webDataManager(
+        context: Context,
+        webViewSessionStorage: WebViewSessionStorage,
+        cookieManager: DuckDuckGoCookieManager,
+        fileDeleter: FileDeleter
+    ): WebDataManager =
+        WebViewDataManager(context, webViewSessionStorage, cookieManager, fileDeleter)
 
     @Provides
     fun clipboardManager(context: Context): ClipboardManager {
@@ -87,8 +131,9 @@ class BrowserModule {
     fun webViewRequestInterceptor(
         resourceSurrogates: ResourceSurrogates,
         trackerDetector: TrackerDetector,
-        httpsUpgrader: HttpsUpgrader
-    ): RequestInterceptor = WebViewRequestInterceptor(resourceSurrogates, trackerDetector, httpsUpgrader)
+        httpsUpgrader: HttpsUpgrader,
+        privacyProtectionCountDao: PrivacyProtectionCountDao
+    ): RequestInterceptor = WebViewRequestInterceptor(resourceSurrogates, trackerDetector, httpsUpgrader, privacyProtectionCountDao)
 
     @Provides
     fun cookieManager(cookieManager: CookieManager): DuckDuckGoCookieManager {
@@ -99,5 +144,22 @@ class BrowserModule {
     @Provides
     fun webViewCookieManager(): CookieManager {
         return CookieManager.getInstance()
+    }
+
+    @Singleton
+    @Provides
+    fun gridViewColumnCalculator(context: Context): GridViewColumnCalculator {
+        return GridViewColumnCalculator(context)
+    }
+
+    @Singleton
+    @Provides
+    fun webViewPreviewPersister(context: Context, fileDeleter: FileDeleter): WebViewPreviewPersister {
+        return FileBasedWebViewPreviewPersister(context, fileDeleter)
+    }
+
+    @Provides
+    fun webViewPreviewGenerator(): WebViewPreviewGenerator {
+        return FileBasedWebViewPreviewGenerator()
     }
 }

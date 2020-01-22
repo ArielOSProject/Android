@@ -73,7 +73,7 @@ class SettingsViewModel @Inject constructor(
 
     fun start() {
 
-        val defaultBrowserAlready = defaultWebBrowserCapability.isCurrentlyConfiguredAsDefaultBrowser()
+        val defaultBrowserAlready = defaultWebBrowserCapability.isDefaultBrowser()
         val variant = variantManager.getVariant()
         val isLightTheme = settingsDataStore.theme == DuckDuckGoTheme.LIGHT
         val automaticallyClearWhat = settingsDataStore.automaticallyClearWhatOption
@@ -163,21 +163,21 @@ class SettingsViewModel @Inject constructor(
         return viewState.value!!
     }
 
-    private fun ClearWhatOption.pixelEvent(): Pixel.PixelName {
+    private fun ClearWhatOption.pixelEvent(): PixelName {
         return when (this) {
-            ClearWhatOption.CLEAR_NONE -> PixelName.AUTOMATIC_CLEAR_DATA_WHAT_OPTION_NONE
-            ClearWhatOption.CLEAR_TABS_ONLY -> PixelName.AUTOMATIC_CLEAR_DATA_WHAT_OPTION_TABS
-            ClearWhatOption.CLEAR_TABS_AND_DATA -> PixelName.AUTOMATIC_CLEAR_DATA_WHAT_OPTION_TABS_AND_DATA
+            ClearWhatOption.CLEAR_NONE -> AUTOMATIC_CLEAR_DATA_WHAT_OPTION_NONE
+            ClearWhatOption.CLEAR_TABS_ONLY -> AUTOMATIC_CLEAR_DATA_WHAT_OPTION_TABS
+            ClearWhatOption.CLEAR_TABS_AND_DATA -> AUTOMATIC_CLEAR_DATA_WHAT_OPTION_TABS_AND_DATA
         }
     }
 
-    private fun ClearWhenOption.pixelEvent(): Pixel.PixelName? {
+    private fun ClearWhenOption.pixelEvent(): PixelName? {
         return when (this) {
-            ClearWhenOption.APP_EXIT_ONLY -> PixelName.AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_ONLY
-            ClearWhenOption.APP_EXIT_OR_5_MINS -> PixelName.AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_5_MINS
-            ClearWhenOption.APP_EXIT_OR_15_MINS -> PixelName.AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_15_MINS
-            ClearWhenOption.APP_EXIT_OR_30_MINS -> PixelName.AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_30_MINS
-            ClearWhenOption.APP_EXIT_OR_60_MINS -> PixelName.AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_60_MINS
+            ClearWhenOption.APP_EXIT_ONLY -> AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_ONLY
+            ClearWhenOption.APP_EXIT_OR_5_MINS -> AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_5_MINS
+            ClearWhenOption.APP_EXIT_OR_15_MINS -> AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_15_MINS
+            ClearWhenOption.APP_EXIT_OR_30_MINS -> AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_30_MINS
+            ClearWhenOption.APP_EXIT_OR_60_MINS -> AUTOMATIC_CLEAR_DATA_WHEN_OPTION_APP_EXIT_OR_60_MINS
             else -> null
         }
     }

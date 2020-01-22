@@ -16,22 +16,33 @@
 
 package com.duckduckgo.app.launch
 
-import androidx.lifecycle.Observer
 import android.os.Bundle
+import androidx.lifecycle.Observer
 import com.duckduckgo.app.browser.BrowserActivity
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.DuckDuckGoActivity
 import com.duckduckgo.app.onboarding.ui.OnboardingActivity
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import com.duckduckgo.app.onboarding.ui.OnboardingActivityExperiment
+import com.duckduckgo.app.statistics.VariantManager
+import javax.inject.Inject
 
 
 class LaunchActivity : DuckDuckGoActivity() {
+
+    @Inject
+    lateinit var variantManager: VariantManager
 
     private val viewModel: LaunchViewModel by bindViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_launch)
+
         configureObservers()
+
+        MainScope().launch { viewModel.determineViewToShow() }
     }
 
     private fun configureObservers() {
@@ -43,21 +54,25 @@ class LaunchActivity : DuckDuckGoActivity() {
     private fun processCommand(it: LaunchViewModel.Command?) {
         when (it) {
             LaunchViewModel.Command.Onboarding -> {
-                showHome(showOnboarding = true)
+                showOnboarding()
             }
             is LaunchViewModel.Command.Home -> {
-                showHome(showOnboarding = false)
+                showHome()
             }
         }
     }
 
-    private fun showHome(showOnboarding: Boolean) {
-        startActivity(BrowserActivity.intent(this))
-
-        if (showOnboarding) {
+    private fun showOnboarding() {
+        if (variantManager.getVariant().hasFeature(VariantManager.VariantFeature.ConceptTest)) {
+            startActivity(OnboardingActivityExperiment.intent(this))
+        } else {
             startActivity(OnboardingActivity.intent(this))
         }
+        finish()
+    }
 
+    private fun showHome() {
+        startActivity(BrowserActivity.intent(this))
         finish()
     }
 }

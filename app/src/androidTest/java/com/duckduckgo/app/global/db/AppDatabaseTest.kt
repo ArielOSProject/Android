@@ -24,8 +24,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.duckduckgo.app.blockingObserve
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
@@ -53,7 +52,7 @@ class AppDatabaseTest {
         testHelper.createDatabase(TEST_DB_NAME, 2).use {
             it.execSQL("INSERT INTO `network_leaderboard` VALUES ('Network2', 'example.com')")
         }
-        assertTrue(database().networkLeaderboardDao().trackerNetworkTally().blockingObserve()!!.isEmpty())
+        assertTrue(database().networkLeaderboardDao().trackerNetworkLeaderboard().blockingObserve()!!.isEmpty())
     }
 
     @Test
@@ -80,11 +79,9 @@ class AppDatabaseTest {
 
     @Test
     fun whenMigratingFromVersion4To5ThenTabsAreConsideredViewed() {
-
         testHelper.createDatabase(TEST_DB_NAME, 4).use {
             it.execSQL("INSERT INTO `tabs` values ('tabid1', 'url', 'title') ")
         }
-
         assertTrue(database().tabsDao().tabs()[0].viewed)
     }
 
@@ -111,6 +108,44 @@ class AppDatabaseTest {
     @Test
     fun whenMigratingFromVersion9To10ThenValidationSucceeds() {
         createDatabaseAndMigrate(9, 10, AppDatabase.MIGRATION_9_TO_10)
+    }
+
+    @Test
+    fun whenMigratingFromVersion10To11ThenValidationSucceeds() {
+        createDatabaseAndMigrate(10, 11, AppDatabase.MIGRATION_10_TO_11)
+    }
+
+    @Test
+    fun whenMigratingFromVersion11To12ThenValidationSucceeds() {
+        createDatabaseAndMigrate(11, 12, AppDatabase.MIGRATION_11_TO_12)
+    }
+
+    @Test
+    fun whenMigratingFromVersion11To12ThenTabsDoNotSkipHome() {
+        testHelper.createDatabase(TEST_DB_NAME, 11).use {
+            it.execSQL("INSERT INTO `tabs` values ('tabid1', 'url', 'title', 1, 0) ")
+        }
+        assertFalse(database().tabsDao().tabs()[0].skipHome)
+    }
+
+    @Test
+    fun whenMigratingFromVersion12To13ThenValidationSucceeds() {
+        createDatabaseAndMigrate(12, 13, AppDatabase.MIGRATION_12_TO_13)
+    }
+
+    @Test
+    fun whenMigratingFromVersion13To14ThenValidationSucceeds() {
+        createDatabaseAndMigrate(13, 14, AppDatabase.MIGRATION_13_TO_14)
+    }
+
+    @Test
+    fun whenMigratingFromVersion14To15ThenValidationSucceeds() {
+        createDatabaseAndMigrate(14, 15, AppDatabase.MIGRATION_14_TO_15)
+    }
+
+    @Test
+    fun whenMigratingFromVersion15To16ThenValidationSucceeds() {
+        createDatabaseAndMigrate(15, 16, AppDatabase.MIGRATION_15_TO_16)
     }
 
     private fun createDatabase(version: Int) {

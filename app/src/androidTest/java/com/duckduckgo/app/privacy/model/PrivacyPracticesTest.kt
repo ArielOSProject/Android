@@ -16,46 +16,63 @@
 
 package com.duckduckgo.app.privacy.model
 
-import com.duckduckgo.app.entities.EntityMapping
-import com.duckduckgo.app.entities.db.EntityListEntity
+import androidx.room.Room
+import androidx.test.platform.app.InstrumentationRegistry
+import com.duckduckgo.app.global.db.AppDatabase
 import com.duckduckgo.app.privacy.model.PrivacyPractices.Practices
 import com.duckduckgo.app.privacy.model.PrivacyPractices.Summary.GOOD
 import com.duckduckgo.app.privacy.store.TermsOfServiceStore
+import com.duckduckgo.app.trackerdetection.EntityLookup
+import com.duckduckgo.app.trackerdetection.TdsEntityLookup
+import com.duckduckgo.app.trackerdetection.db.TdsDomainEntityDao
+import com.duckduckgo.app.trackerdetection.db.TdsEntityDao
+import com.duckduckgo.app.trackerdetection.model.TdsDomainEntity
+import com.duckduckgo.app.trackerdetection.model.TdsEntity
+import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.whenever
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations.initMocks
 
 class PrivacyPracticesTest {
 
-    private val entityMapping = EntityMapping()
+    private lateinit var db: AppDatabase
+    private lateinit var entityDao: TdsEntityDao
+    private lateinit var domainEntityDao: TdsDomainEntityDao
+    private lateinit var entityLookup: EntityLookup
+    private val mockTermsStore: TermsOfServiceStore = mock()
 
-    @Mock
-    lateinit var mockTermsStore: TermsOfServiceStore
+    private lateinit var testee: PrivacyPracticesImpl
 
     @Before
     fun before() {
-        initMocks(this)
+        db = Room.inMemoryDatabaseBuilder(InstrumentationRegistry.getInstrumentation().targetContext, AppDatabase::class.java).build()
+        entityDao = db.tdsEntityDao()
+        domainEntityDao = db.tdsDomainEntityDao()
+        entityLookup = TdsEntityLookup(entityDao, domainEntityDao)
+        testee = PrivacyPracticesImpl(mockTermsStore, entityLookup)
+    }
+
+    @After
+    fun after() {
+        db.close()
     }
 
     @Test
-    fun whenUrlButNoParentEntityThenStillHasScore() {
+    fun whenUrlButNoParentEntityThenStillHasScore() = runBlocking {
         whenever(mockTermsStore.terms).thenReturn(
             listOf(
                 TermsOfService("example.com", classification = "D")
             )
         )
 
-        val testee = PrivacyPracticesImpl(mockTermsStore, entityMapping)
-
         assertEquals(10, testee.privacyPracticesFor("http://www.example.com").score)
-
     }
 
     @Test
-    fun whenUrlHasParentEntityThenItsScoreIsWorstInNetwork() {
+    fun whenUrlHasParentEntityThenItsScoreIsWorstInNetwork() = runBlocking {
         whenever(mockTermsStore.terms).thenReturn(
             listOf(
                 TermsOfService("sibling1.com", classification = "A"),
@@ -65,36 +82,38 @@ class PrivacyPracticesTest {
             )
         )
 
-        entityMapping.updateEntities(
+        entityDao.insertAll(
             listOf(
-                EntityListEntity("sibling1.com", "Network"),
-                EntityListEntity("sibling2.com", "Network"),
-                EntityListEntity("sibling3.com", "Network"),
-                EntityListEntity("sibling4.com", "Network")
+                TdsEntity("Network Inc", "Network", 0.0),
+                TdsEntity("Network Inc", "Network", 0.0),
+                TdsEntity("Network Inc", "Network", 0.0),
+                TdsEntity("Network Inc", "Network", 0.0)
             )
         )
 
-        val testee = PrivacyPracticesImpl(mockTermsStore, entityMapping)
+        domainEntityDao.insertAll(
+            listOf(
+                TdsDomainEntity("sibling1.com", "Network Inc"),
+                TdsDomainEntity("sibling2.com", "Network Inc"),
+                TdsDomainEntity("sibling3.com", "Network Inc"),
+                TdsDomainEntity("sibling4.com", "Network Inc")
+            )
+        )
+
+        testee.loadData()
 
         assertEquals(10, testee.privacyPracticesFor("http://www.sibling1.com").score)
     }
 
     @Test
-    fun whenUrlHasMatchingEntityWithTermsThenPracticesAreReturned() {
+    fun whenUrlHasMatchingEntityWithTermsThenPracticesAreReturned() = runBlocking {
         whenever(mockTermsStore.terms).thenReturn(listOf(TermsOfService("example.com", classification = "A")))
-
-        entityMapping.updateEntities(listOf(EntityListEntity("example.com", "Network")))
-
-        val testee = PrivacyPracticesImpl(mockTermsStore, entityMapping)
-
         val expected = Practices(score = 0, summary = GOOD, goodReasons = emptyList(), badReasons = emptyList())
         assertEquals(expected, testee.privacyPracticesFor("http://www.example.com"))
     }
 
     @Test
-    fun whenInitialisedWithEmptyTermsStoreAndEntityListThenReturnsUnknownForUrl() {
-        val testee = PrivacyPracticesImpl(mockTermsStore, entityMapping)
+    fun whenInitialisedWithEmptyTermsStoreAndEntityListThenReturnsUnknownForUrl() = runBlocking {
         assertEquals(PrivacyPractices.UNKNOWN, testee.privacyPracticesFor("http://www.example.com"))
     }
-
 }

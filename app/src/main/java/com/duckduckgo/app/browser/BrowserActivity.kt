@@ -22,41 +22,50 @@ import android.content.Context
 import android.content.Intent
 import android.content.Intent.EXTRA_TEXT
 import android.os.Bundle
+import android.os.Message
 import android.widget.Toast
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.Observer
 import com.duckduckgo.app.bookmarks.ui.BookmarksActivity
+import com.duckduckgo.app.brokensite.BrokenSiteActivity
 import com.duckduckgo.app.browser.BrowserViewModel.Command
 import com.duckduckgo.app.browser.BrowserViewModel.Command.Query
 import com.duckduckgo.app.browser.BrowserViewModel.Command.Refresh
 import com.duckduckgo.app.browser.rating.ui.AppEnjoymentDialogFragment
 import com.duckduckgo.app.browser.rating.ui.GiveFeedbackDialogFragment
 import com.duckduckgo.app.browser.rating.ui.RateAppDialogFragment
-import com.duckduckgo.app.feedback.ui.FeedbackActivity
+import com.duckduckgo.app.feedback.ui.common.FeedbackActivity
 import com.duckduckgo.app.fire.DataClearer
 import com.duckduckgo.app.global.ApplicationClearDataState
 import com.duckduckgo.app.global.DuckDuckGoActivity
 import com.duckduckgo.app.global.intentText
 import com.duckduckgo.app.global.view.*
+import com.duckduckgo.app.onboarding.ui.page.DefaultBrowserPage
 import com.duckduckgo.app.playstore.PlayStoreUtils
 import com.duckduckgo.app.privacy.ui.PrivacyDashboardActivity
 import com.duckduckgo.app.settings.SettingsActivity
+import com.duckduckgo.app.statistics.pixels.Pixel
 import com.duckduckgo.app.tabs.model.TabEntity
-import com.duckduckgo.app.tabs.ui.TabSwitcherActivity
 import kotlinx.android.synthetic.main.activity_browser.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.jetbrains.anko.longToast
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.coroutines.CoroutineContext
 
-class BrowserActivity : DuckDuckGoActivity() {
+class BrowserActivity : DuckDuckGoActivity(), CoroutineScope {
+
+    override val coroutineContext: CoroutineContext
+        get() = SupervisorJob() + Dispatchers.Main
 
     @Inject
     lateinit var clearPersonalDataAction: ClearPersonalDataAction
 
     @Inject
     lateinit var dataClearer: DataClearer
+
+    @Inject
+    lateinit var pixel: Pixel
 
     @Inject
     lateinit var playStoreUtils: PlayStoreUtils
@@ -105,9 +114,9 @@ class BrowserActivity : DuckDuckGoActivity() {
         }
     }
 
-    private fun openNewTab(tabId: String, url: String? = null) {
+    private fun openNewTab(tabId: String, url: String? = null, skipHome: Boolean): BrowserTabFragment {
         Timber.i("Opening new tab, url: $url, tabId: $tabId")
-        val fragment = BrowserTabFragment.newInstance(tabId, url)
+        val fragment = BrowserTabFragment.newInstance(tabId, url, skipHome)
         val transaction = supportFragmentManager.beginTransaction()
         val tab = currentTab
         if (tab == null) {
@@ -118,10 +127,11 @@ class BrowserActivity : DuckDuckGoActivity() {
         }
         transaction.commit()
         currentTab = fragment
+        return fragment
     }
 
     private fun selectTab(tab: TabEntity?) {
-        Timber.i("Select tab: $tab")
+        Timber.v("Select tab: $tab")
 
         if (tab == null) return
 
@@ -129,7 +139,7 @@ class BrowserActivity : DuckDuckGoActivity() {
 
         val fragment = supportFragmentManager.findFragmentByTag(tab.tabId) as? BrowserTabFragment
         if (fragment == null) {
-            openNewTab(tab.tabId, tab.url)
+            openNewTab(tab.tabId, tab.url, tab.skipHome)
             return
         }
         val transaction = supportFragmentManager.beginTransaction()
@@ -155,6 +165,12 @@ class BrowserActivity : DuckDuckGoActivity() {
             return
         }
 
+        if (intent.getBooleanExtra(LAUNCH_FROM_DEFAULT_BROWSER_DIALOG, false)) {
+            setResult(DefaultBrowserPage.DEFAULT_BROWSER_RESULT_CODE_DIALOG_INTERNAL)
+            finish()
+            return
+        }
+
         if (intent.getBooleanExtra(PERFORM_FIRE_ON_ENTRY_EXTRA, false)) {
 
             Timber.i("Clearing everything as a result of $PERFORM_FIRE_ON_ENTRY_EXTRA flag being set")
@@ -172,16 +188,23 @@ class BrowserActivity : DuckDuckGoActivity() {
             Toast.makeText(applicationContext, R.string.fireDataCleared, Toast.LENGTH_LONG).show()
         }
 
+        if (launchedFromWidget(intent)) {
+            Timber.w("new tab requested from widget")
+            pixel.fire(Pixel.PixelName.WIDGET_LAUNCHED)
+            launch { viewModel.onNewTabRequested() }
+            return
+        }
+
         if (launchNewSearch(intent)) {
             Timber.w("new tab requested")
-            viewModel.onNewTabRequested()
+            launch { viewModel.onNewTabRequested() }
             return
         }
 
         val sharedText = intent.intentText
         if (sharedText != null) {
             Timber.w("opening in new tab requested for $sharedText")
-            viewModel.onOpenInNewTabRequested(sharedText)
+            launch { viewModel.onOpenInNewTabRequested(sharedText, true) }
             return
         }
     }
@@ -195,7 +218,7 @@ class BrowserActivity : DuckDuckGoActivity() {
         })
         viewModel.tabs.observe(this, Observer {
             clearStaleTabs(it)
-            viewModel.onTabsUpdated(it)
+            launch { viewModel.onTabsUpdated(it) }
         })
     }
 
@@ -223,18 +246,22 @@ class BrowserActivity : DuckDuckGoActivity() {
         Timber.i("Processing command: $command")
         when (command) {
             is Query -> currentTab?.submitQuery(command.query)
-            is Refresh -> currentTab?.refresh()
+            is Refresh -> currentTab?.onRefreshRequested()
             is Command.DisplayMessage -> applicationContext?.longToast(command.messageId)
             is Command.LaunchPlayStore -> launchPlayStore()
             is Command.ShowAppEnjoymentPrompt -> showAppEnjoymentPrompt(AppEnjoymentDialogFragment.create(command.promptCount, viewModel))
             is Command.ShowAppRatingPrompt -> showAppEnjoymentPrompt(RateAppDialogFragment.create(command.promptCount, viewModel))
             is Command.ShowAppFeedbackPrompt -> showAppEnjoymentPrompt(GiveFeedbackDialogFragment.create(command.promptCount, viewModel))
-            is Command.LaunchFeedbackView -> startActivity(FeedbackActivity.intent(this, brokenSite = false))
+            is Command.LaunchFeedbackView -> startActivity(FeedbackActivity.intent(this))
         }
     }
 
+    private fun launchedFromWidget(intent: Intent): Boolean {
+        return intent.getBooleanExtra(WIDGET_SEARCH_EXTRA, false)
+    }
+
     private fun launchNewSearch(intent: Intent): Boolean {
-        return intent.getBooleanExtra(NEW_SEARCH_EXTRA, false) || intent.action == Intent.ACTION_ASSIST
+        return intent.getBooleanExtra(NEW_SEARCH_EXTRA, false) || intent.action == Intent.ACTION_ASSIST || intent.action == NEW_SEARCH_ACTION
     }
 
     fun launchPrivacyDashboard() {
@@ -244,29 +271,35 @@ class BrowserActivity : DuckDuckGoActivity() {
     }
 
     fun launchFire() {
+        pixel.fire(Pixel.PixelName.FORGET_ALL_PRESSED_BROWSING)
         val dialog = FireDialog(context = this, clearPersonalDataAction = clearPersonalDataAction)
         dialog.clearStarted = {
+            removeObservers()
             clearingInProgressView.show()
         }
         dialog.clearComplete = { viewModel.onClearComplete() }
         dialog.show()
     }
 
-    fun launchTabSwitcher() {
-        startActivity(TabSwitcherActivity.intent(this))
-    }
-
     fun launchNewTab() {
-        viewModel.onNewTabRequested()
+        launch { viewModel.onNewTabRequested() }
     }
 
     fun openInNewTab(query: String) {
-        viewModel.onOpenInNewTabRequested(query)
+        launch { viewModel.onOpenInNewTabRequested(query) }
+    }
+
+    fun openMessageInNewTab(message: Message) {
+        launch {
+            val tabId = viewModel.onNewTabRequested()
+            val fragment = openNewTab(tabId, null, false)
+            fragment.messageFromPreviousTab = message
+        }
     }
 
     fun launchBrokenSiteFeedback(url: String?) {
         val options = ActivityOptions.makeSceneTransitionAnimation(this).toBundle()
-        startActivity(FeedbackActivity.intent(this, true, url), options)
+        startActivity(BrokenSiteActivity.intent(this, url), options)
     }
 
     fun launchSettings() {
@@ -293,17 +326,27 @@ class BrowserActivity : DuckDuckGoActivity() {
 
     companion object {
 
-        fun intent(context: Context, queryExtra: String? = null, newSearch: Boolean = false, launchedFromFireAction: Boolean = false): Intent {
+        fun intent(
+            context: Context,
+            queryExtra: String? = null,
+            newSearch: Boolean = false,
+            widgetSearch: Boolean = false,
+            launchedFromFireAction: Boolean = false
+        ): Intent {
             val intent = Intent(context, BrowserActivity::class.java)
             intent.putExtra(EXTRA_TEXT, queryExtra)
             intent.putExtra(NEW_SEARCH_EXTRA, newSearch)
+            intent.putExtra(WIDGET_SEARCH_EXTRA, widgetSearch)
             intent.putExtra(LAUNCHED_FROM_FIRE_EXTRA, launchedFromFireAction)
             return intent
         }
 
+        const val NEW_SEARCH_ACTION = "com.duckduckgo.mobile.android.NEW_SEARCH"
         const val NEW_SEARCH_EXTRA = "NEW_SEARCH_EXTRA"
+        const val WIDGET_SEARCH_EXTRA = "WIDGET_SEARCH_EXTRA"
         const val PERFORM_FIRE_ON_ENTRY_EXTRA = "PERFORM_FIRE_ON_ENTRY_EXTRA"
         const val LAUNCHED_FROM_FIRE_EXTRA = "LAUNCHED_FROM_FIRE_EXTRA"
+        const val LAUNCH_FROM_DEFAULT_BROWSER_DIALOG = "LAUNCH_FROM_DEFAULT_BROWSER_DIALOG"
 
         private const val APP_ENJOYMENT_DIALOG_TAG = "AppEnjoyment"
 
@@ -339,13 +382,16 @@ class BrowserActivity : DuckDuckGoActivity() {
                 return
             }
 
-            if (!processedOriginalIntent && instanceStateBundles?.originalInstanceState == null) {
+            if (!processedOriginalIntent && instanceStateBundles?.originalInstanceState == null && !intent.launchedFromRecents) {
                 Timber.i("Original instance state is null, so will inspect intent for actions to take. $intent")
                 launchNewSearchOrQuery(intent)
                 processedOriginalIntent = true
             }
         }
     }
+
+    private val Intent.launchedFromRecents: Boolean
+        get() = (flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY
 
     private fun showAppEnjoymentPrompt(prompt: DialogFragment) {
         currentAppEnjoymentFragment?.dismiss()
@@ -360,7 +406,7 @@ class BrowserActivity : DuckDuckGoActivity() {
     }
 
     private fun launchPlayStore() {
-        playStoreUtils.launchPlayStore(this)
+        playStoreUtils.launchPlayStore()
     }
 
     private data class CombinedInstanceState(val originalInstanceState: Bundle?, val newInstanceState: Bundle?)

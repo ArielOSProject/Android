@@ -14,16 +14,21 @@
  * limitations under the License.
  */
 
+@file:Suppress("RemoveExplicitTypeArguments")
+
 package com.duckduckgo.app.tabs.ui
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.Observer
+import com.duckduckgo.app.CoroutineTestRule
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
 import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.model.TabRepository
 import com.duckduckgo.app.tabs.ui.TabSwitcherViewModel.Command
 import com.nhaarman.mockitokotlin2.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -39,6 +44,10 @@ class TabSwitcherViewModelTest {
     @Suppress("unused")
     var instantTaskExecutorRule = InstantTaskExecutorRule()
 
+    @ExperimentalCoroutinesApi
+    @get:Rule
+    var coroutinesTestRule = CoroutineTestRule()
+
     @Mock
     private lateinit var mockCommandObserver: Observer<Command>
 
@@ -53,13 +62,15 @@ class TabSwitcherViewModelTest {
     @Before
     fun before() {
         MockitoAnnotations.initMocks(this)
-        whenever(mockTabRepository.add()).thenReturn("TAB_ID")
-        testee = TabSwitcherViewModel(mockTabRepository, WebViewSessionInMemoryStorage())
-        testee.command.observeForever(mockCommandObserver)
+        runBlocking {
+            whenever(mockTabRepository.add()).thenReturn("TAB_ID")
+            testee = TabSwitcherViewModel(mockTabRepository, WebViewSessionInMemoryStorage())
+            testee.command.observeForever(mockCommandObserver)
+        }
     }
 
     @Test
-    fun whenNewTabRequestedThenRepositoryNotifiedAndSwitcherClosed() {
+    fun whenNewTabRequestedThenRepositoryNotifiedAndSwitcherClosed() = runBlocking<Unit> {
         testee.onNewTabRequested()
         verify(mockTabRepository).add()
         verify(mockCommandObserver).onChanged(commandCaptor.capture())
@@ -67,7 +78,7 @@ class TabSwitcherViewModelTest {
     }
 
     @Test
-    fun whenTabSelectedThenRepositoryNotifiedAndSwitcherClosed() {
+    fun whenTabSelectedThenRepositoryNotifiedAndSwitcherClosed() = runBlocking<Unit> {
         testee.onTabSelected(TabEntity("abc", "", "", position = 0))
         verify(mockTabRepository).select(eq("abc"))
         verify(mockCommandObserver).onChanged(commandCaptor.capture())
@@ -75,7 +86,7 @@ class TabSwitcherViewModelTest {
     }
 
     @Test
-    fun whenTabDeletedThenRepositoryNotified() {
+    fun whenTabDeletedThenRepositoryNotified() = runBlocking<Unit> {
         val entity = TabEntity("abc", "", "", position = 0)
         testee.onTabDeleted(entity)
         verify(mockTabRepository).delete(entity)
